@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3 Animation Framework</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: Inter, sans-serif;
+            margin: 0;
+            padding: 40px;
+            background: #fafafa;
+            color: #2c3e50;
+        }
+		
+		.heading {
+			font-size: 1.7rem;
+			font-weight: 400;
+			color: #044d6f;
+			margin-bottom: 0.5rem;
+		}
+		.author {
+			font-weight: 400;
+			margin-bottom: 2em;
+		}
+		
+		.text-content {
+			line-height: 1.3;
+		}
+        
+		.content {
+			max-width: 800px;
+            margin: 0 auto;
+            background: white;
+			padding: 40px;
+        }
+		
+        .chart-container {
+			border-top: 1px solid;
+			border-bottom: 1px solid;
+			border-color: #bfbfbf;
+            /*border-radius: 12px;*/
+            /*box-shadow: 0 4px 20px rgba(0,0,0,0.08);*/
+        }
+        
+        .chart-header {
+			margin-top: 0.5em;
+            margin-bottom: 1.5em;
+        }
+        
+        .chart-title {
+            font-size: 1.7rem;
+			font-weight: 400;
+			color: #044d6f;
+            margin: 0 0 0 0;
+            line-height: 1.1;
+        }
+        
+        .chart-subtitle {
+            font-size: 16px;
+            color: #64748b;
+            margin: 0;
+            line-height: 1.4;
+        }
+        
+        .chart-notes {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+		
+		.chart-footnote, .chart-source {
+			margin-bottom: 5px;
+		}
+        
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 0 0;
+            padding-left: 20px;
+            /*background: #f8fafc;*/
+            border-radius: 8px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+			width: 3em;
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        
+        .btn-secondary:hover {
+            background: #cbd5e1;
+            transform: translateY(-1px);
+        }
+        
+        .scrubber-container {
+            flex: 1;
+            margin-left: 20px;
+        }
+        
+        .scrubber-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+        
+        .scrubber {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .scrubber-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            border-radius: 3px;
+            width: 0%;
+        }
+        
+        .scrubber-handle {
+            position: absolute;
+            top: -6px;
+            width: 12px;
+            height: 12px;
+            background: white;
+            border: 3px solid #3b82f6;
+            border-radius: 50%;
+            cursor: grab;
+            transform: translateX(-50%);
+            transition: transform 0.2s ease;
+            left: 0%;
+        }
+        
+        .scrubber-handle:hover {
+            transform: translateX(-50%) scale(1.1);
+        }
+        
+        .scrubber-handle:active {
+            cursor: grabbing;
+            transform: translateX(-50%) scale(0.95);
+        }
+        
+        .time-display {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 8px;
+        }
+        
+        svg {
+            overflow: visible;
+        }
+        
+        .axis {
+            font-size: 12px;
+            color: #64748b;
+        }
+		
+		.y-axis {
+            font-size: 11px;
+        }
+		
+		.axis line {
+            stroke: #f1f5f9;
+        }
+        
+        .axis-label {
+            font-size: 13px;
+            font-weight: 500;
+            fill: #475569;
+        }
+        
+        .grid-line {
+            stroke: #f1f5f9;
+            stroke-width: 1;
+        }
+        
+        .data-line {
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+        }
+        
+        .annotation {
+            pointer-events: none;
+        }
+        
+        .annotation-box {
+            fill: white;
+            stroke: #e2e8f0;
+            stroke-width: 1;
+            rx: 6;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.1));
+        }
+        
+        .annotation-text {
+            font-size: 13px;
+            font-weight: 500;
+            fill: #1a202c;
+        }
+        
+        .annotation-subtext {
+            font-size: 11px;
+            fill: #64748b;
+        }
+    </style>
+</head>
+<body>
+	<div class="content">
+	<h2 class="heading">The US Retirement System Is Working</h2>
+    <div class="author">By Peter Brady and Steven Bass</div>
+	<p class="text-content">Although the importance of retirement plans varies with each worker’s lifetime earnings, most Americans maintain a high share of their spendable income in retirement. In fact, those who had lower income in their late 50s typically replace a higher share of their spendable income in retirement, despite being more reliant on Social Security. At age 72, lower-income Americans typically have replacement rates above 100 percent, meaning their spendable income in retirement exceeds that of their late 50s. Middle-income Americans also enjoy very high replacement rates at age 72—typically ranging between 90 percent and 95 percent.</p>
+    <div class="chart-container">
+        <div class="chart-header">
+            <h1 class="chart-title">Largest Spendable Income Declines Among Highest Income</h1>
+            <p class="chart-subtitle">Median per capita inflation-adjusted income* by age/year and income ventile<sup>†</sup> (thousands of 2017 dollars)</p>
+        </div>
+        
+        <div id="chart"></div>
+        <div class="controls">
+            <button id="playBtn" class="btn btn-primary">
+                <span id="playIcon">▶</span>
+            </button>
+            <button id="stopBtn" class="btn btn-secondary">
+                <span>⏹</span>
+            </button>
+            <button id="restartBtn" class="btn btn-secondary">
+                <span>⟲</span>
+            </button>
+            
+            <div class="scrubber-container">
+                <div class="scrubber" id="scrubber">
+                    <div class="scrubber-progress" id="scrubberProgress"></div>
+                    <div class="scrubber-handle" id="scrubberHandle"></div>
+                </div>
+                <div class="time-display" id="timeDisplay">0.0s / 20.0s</div>
+            </div>
+        </div>
+        <div class="chart-notes">
+            <div class="chart-footnote">*Medians are among individuals with total income.</div>
+			<div class="chart-footnote"><sup>†</sup>Individuals alive at age 59 are ranked by their average total income between ages 55 and 59. Individuals with positive average total income are split into 20 equally sized groups or "ventiles" with ventile 1 having the lowest income and ventile 20 having the highest income. The 1.0 percent of the panel with zero or negative average total income between ages 55 and 59 are included in the totals but not presented separately here.</div>
+			<div class="chart-source">Source: Authors’ tabulation of IRS data</div>
+        </div>
+		</div>
+		<p class="text-content">Although the importance of retirement plans varies with each worker’s lifetime earnings, most Americans maintain a high share of their spendable income in retirement. In fact, those who had lower income in their late 50s typically replace a higher share of their spendable income in retirement, despite being more reliant on Social Security. At age 72, lower-income Americans typically have replacement rates above 100 percent, meaning their spendable income in retirement exceeds that of their late 50s. Middle-income Americans also enjoy very high replacement rates at age 72—typically ranging between 90 percent and 95 percent.</p>
+		<p class="text-content">Although the importance of retirement plans varies with each worker’s lifetime earnings, most Americans maintain a high share of their spendable income in retirement. In fact, those who had lower income in their late 50s typically replace a higher share of their spendable income in retirement, despite being more reliant on Social Security. At age 72, lower-income Americans typically have replacement rates above 100 percent, meaning their spendable income in retirement exceeds that of their late 50s. Middle-income Americans also enjoy very high replacement rates at age 72—typically ranging between 90 percent and 95 percent.</p>
+    </div>
+
+    <script>
+        class AnimationController {
+            constructor(data) {
+                this.duration = 20000; // 20 seconds
+                this.currentTime = 0;
+                this.isPlaying = false;
+                this.isPaused = false;
+                this.startTimestamp = null;
+                this.pausedAt = 0;
+				this.maskScrubber = 0;
+                this.transitions = [];
+                this.elements = new Map();
+                this.scales = {
+                    x: null,
+                    y: null,
+                    initialY: null
+                };
+
+				this.data = data;
+                this.setupChart();
+                this.setupControls();
+                this.initializeState();
+            }
+            
+            setupChart() {
+                const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+                const width = 800 - margin.left - margin.right;
+                const height = 400 - margin.top - margin.bottom;
+                
+                const svg = d3.select("#chart")
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom);
+                
+                const g = svg.append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+                
+                // Create scales
+                this.scales.x = d3.scaleLinear().domain([2000, 2017]).range([20, width-20]);
+                this.scales.initialY = d3.scaleLinear().domain([0, 50]).range([height, 0]);
+                this.scales.y = this.scales.initialY.copy();
+                
+                // Create axes
+				const parseDate = d3.timeFormat("’%y")
+                this.xAxis1 = d3.axisBottom(this.scales.x).tickFormat(d => `${55 + (d - 2000)}`).ticks(18);
+				this.xAxis2 = d3.axisBottom(this.scales.x).tickFormat(d => parseDate(new Date(d, 0, 1))).ticks(18);
+                this.yAxis = d3.axisLeft(this.scales.y).ticks(6).tickSize(-width);
+                
+                const xAxisGroup = g.append("g")
+                    .attr("class", "axis x-axis")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(this.xAxis1);
+				const xAxisGroup2 = g.append("g")
+                    .attr("class", "axis x-axis")
+                    .attr("transform", `translate(0,${height+20})`)
+                    .call(this.xAxis2);
+				xAxisGroup.selectAll("path").remove();
+				xAxisGroup2.selectAll("path,line").remove();
+                
+                const yAxisGroup = g.append("g")
+                    .attr("class", "axis y-axis")
+                    .call(this.yAxis);
+				yAxisGroup.selectAll("path,line").remove();
+				
+                // Add grid lines
+                const gridGroup = g.append("g").attr("class", "grid");
+                
+                // Y grid lines
+                gridGroup.selectAll(".y-grid")
+                    .data(this.scales.y.ticks(6))
+                    .enter()
+                    .append("line")
+                    .attr("class", "grid-line y-grid")
+                    .attr("x1", 0)
+                    .attr("x2", width)
+                    .attr("y1", d => this.scales.y(d))
+                    .attr("y2", d => this.scales.y(d));
+                
+                // X grid lines
+                gridGroup.selectAll(".x-grid")
+                    .data(this.scales.x.ticks(18))
+                    .enter()
+                    .append("line")
+                    .attr("class", "grid-line x-grid")
+                    .attr("x1", d => this.scales.x(d))
+                    .attr("x2", d => this.scales.x(d))
+                    .attr("y1", 0)
+                    .attr("y2", height);
+                
+                // Add axis labels
+                xAxisGroup.append("text")
+                    .attr("class", "axis-label")
+                    .attr("x", 0)
+                    .attr("y", 18)
+                    .style("text-anchor", "end")
+                    .text("Age");
+				xAxisGroup.append("text")
+                    .attr("class", "axis-label")
+                    .attr("x", 0)
+                    .attr("y", 38)
+                    .style("text-anchor", "end")
+                    .text("Year");
+                
+                /*yAxisGroup.append("text")
+                    .attr("class", "axis-label")
+                    .attr("transform", "rotate(-90)")
+                    .attr("x", -height / 2)
+                    .attr("y", -40)
+                    .style("text-anchor", "middle")
+                    .text("Revenue (Billions USD)");*/
+                
+                // Create line generator
+                this.line = d3.line()
+                    .x(d => this.scales.x(d.x))
+                    .y(d => this.scales.y(d.y));
+                
+                // Create lines
+                this.data.forEach((series, i) => {
+					//if (i===1) {console.log(series.values[series.values.length-1].x, series.values[series.values.length-1].y);};
+						const path = g.append("path")
+							.datum(series.values)
+							.attr("class", `data-line line-${i}`)
+							.attr("d", this.line)
+							.style("stroke", series.color)
+							.style("stroke-width", series.linewidth)
+							.style("opacity", 1);
+                    
+                    // Calculate path length for dash animation
+                    const totalLength = path.node().getTotalLength();
+                    path
+                        .attr("stroke-dasharray", `${totalLength} ${totalLength}`)
+                        .attr("stroke-dashoffset", totalLength);
+                    
+                    this.elements.set(`line-${i}`, {
+                        element: path,
+                        totalLength: totalLength,
+                        series: series
+                    });
+					
+					// Create text label for each line
+					const textLabel = g.append("text")
+						.attr("class", `line-label label-${i}`)
+						.attr("x", this.scales.x(2017.2))
+						.attr("y", this.scales.y(series.values[series.values.length - 1].y))
+						.attr("text-anchor", "start")
+						.attr("dominant-baseline", "middle")
+						.style("font-size", "12px")
+						.style("font-weight", "500")
+						.style("fill", "#475569")
+						.style("opacity", 0)
+						.text(i + 1);
+
+					this.elements.set(`label-${i}`, {
+						element: textLabel,
+						series: series
+					});
+                });
+				// Set special 10 + 11 label
+				let yPos = (this.data[9].values[this.data[9].values.length-1].y + this.data[10].values[this.data[10].values.length-1].y) / 2
+				const textLabel = g.append("text")
+					.attr("class", 'line-label label-20')
+					.attr("x", this.scales.x(2017.2))
+					.attr("y", this.scales.y(yPos))
+					.attr("text-anchor", "start")
+					.attr("dominant-baseline", "middle")
+					.style("font-size", "12px")
+					.style("font-weight", "500")
+					.style("fill", "#475569")
+					.style("opacity", 0)
+					.text('10 + 11');
+
+				this.elements.set('label-20', {
+					element: textLabel
+				});
+                
+                // Create annotation
+                const annotation1 = g.append('foreignObject')
+					.attr('x', width * 0.6)
+					.attr('y', height * 0.1)
+					.attr('width', 200)
+					.attr('height', 600);
+
+				annotation1.append('xhtml:div')
+					.style('background', '#7399bf')
+					.style('border', '1px solid #e2e8f0')
+					.style('border-radius', '6px')
+					.style('padding', '12px')
+					.style('font-size', '13px')
+					.style('color', 'white')
+					.html(`
+						<!--<div style="font-weight: 600; margin-bottom: 4px;">Title text</div>-->
+						<div style="font-size: 11px;">
+							Median spendable income remains flat or even increases for the bottom 25% of the population 
+						</div>
+					`);
+                
+                this.elements.set('annotation1', { element: annotation1 });
+                this.elements.set('grid', { element: gridGroup });
+                this.elements.set('y-axis', { element: yAxisGroup });
+                
+                this.svg = svg;
+                this.chartArea = g;
+                this.width = width;
+                this.height = height;
+            }
+            
+            setupControls() {
+                const playBtn = document.getElementById('playBtn');
+                const stopBtn = document.getElementById('stopBtn');
+                const restartBtn = document.getElementById('restartBtn');
+                const scrubber = document.getElementById('scrubber');
+                const scrubberHandle = document.getElementById('scrubberHandle');
+                
+                playBtn.addEventListener('click', () => {
+                    if (this.isPlaying) {
+                        this.pause();
+                    } else {
+                        this.play();
+                    }
+                });
+                
+                stopBtn.addEventListener('click', () => this.stop());
+                restartBtn.addEventListener('click', () => this.restart());
+                
+                // Scrubber functionality
+                let isDragging = false;
+                
+                const updateScrubber = (e) => {
+                    const rect = scrubber.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                    const progress = x / rect.width;
+                    const newTime = progress * this.duration;
+                    
+                    this.seekTo(newTime);
+                };
+                
+                scrubber.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    updateScrubber(e);
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        updateScrubber(e);
+                    }
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+            }
+
+			drawLine(lineNumber,startTime,endTime) {
+				this.transitions.push({
+					id: 'line-' + lineNumber + '-draw', 
+					element: 'line-' + lineNumber, 
+					attribute: 'stroke-dashoffset', 
+					startTime: startTime, 
+					endTime: endTime, 
+					startValue: this.elements.get('line-' + lineNumber).totalLength, 
+					endValue: 0,
+					type: 'line-draw'
+				});
+				this.transitions.push({
+					id: 'line-' + lineNumber + '-opacity', 
+					element: 'line-' + lineNumber, 
+					attribute: 'opacity', 
+					startTime: startTime, 
+					endTime: startTime, 
+					startValue: 0, 
+					endValue: 1,
+					type: 'opacity'
+				});
+				this.transitions.push({
+					id: 'label-' + lineNumber + '-opacity', 
+					element: 'label-' + lineNumber, 
+					attribute: 'opacity', 
+					startTime: startTime, 
+					endTime: startTime+20, 
+					startValue: 0, 
+					endValue: 1,
+					type: 'opacity'
+				});
+			}
+			
+			removeLabels(labelList, startTime, endTime) {
+				labelList.forEach((label, i) => {
+					this.transitions.push({
+						id: 'label-' + label + '-opacity', 
+						element: 'label-' + label, 
+						attribute: 'opacity', 
+						startTime: startTime, 
+						endTime: endTime, 
+						startValue: 1, 
+						endValue: 0,
+						type: 'opacity'
+					});
+				});
+			}
+			
+            initializeTransitions() {
+                this.transitions = [
+                    { 
+                        id: 'annotation-in', 
+                        element: 'annotation1', 
+                        attribute: 'opacity', 
+                        startTime: 100, 
+                        endTime: 600, 
+                        startValue: 0, 
+                        endValue: 1,
+                        type: 'opacity'
+                    },
+                    { 
+                        id: 'annotation-out', 
+                        element: 'annotation1', 
+                        attribute: 'opacity', 
+                        startTime: 5900, 
+                        endTime: 6400, 
+                        startValue: 0.7, 
+                        endValue: 0,
+                        type: 'opacity'
+                    },
+                    
+                    { 
+                        id: 'y-axis-scale', 
+                        element: 'y-axis', 
+                        attribute: 'scale', 
+                        startTime: 13700, 
+                        endTime: 14700, 
+                        startValue: [0, 50], 
+                        endValue: [0, 100],
+                        type: 'axis'
+                    },
+                    { 
+                        id: 'label-20-draw', 
+                        element: 'label-20', 
+                        attribute: 'opacity', 
+                        startTime: 13700, 
+                        endTime: 14700, 
+                        startValue: 0, 
+                        endValue: 1,
+                        type: 'opacity'
+                    },
+                    { 
+                        id: 'y-axis-scale', 
+                        element: 'y-axis', 
+                        attribute: 'scale', 
+                        startTime: 16400, 
+                        endTime: 17400, 
+                        startValue: [0, 100], 
+                        endValue: [0, 165],
+                        type: 'axis'
+                    }
+                ];
+				this.drawLine(0,100,2100);
+				this.drawLine(1,2600,2600);
+				this.drawLine(2,3100,3100);
+				this.drawLine(3,3600,3600);
+				this.drawLine(4,4100,6100);
+				this.drawLine(5,6600,6600);
+				this.drawLine(6,7100,7100);
+				this.drawLine(7,7600,7600);
+				this.drawLine(8,8100,8100);
+				this.drawLine(9,8600,9600);
+				this.drawLine(10,8600,9600);
+				this.drawLine(11,10100,10100);
+				this.drawLine(12,10600,10600);
+				this.drawLine(13,11100,11100);
+				this.drawLine(14,11600,13600);
+				this.removeLabels([1,2,3,5,6,7,8,9,10,11,12,13],13700,14700);
+				//Axis transition
+				this.drawLine(15,14800,14800);
+				this.drawLine(16,15300,15300);
+				this.drawLine(17,15800,15800);
+				this.drawLine(18,16300,16300);
+				this.removeLabels([15,16,17,18],16400,17400);
+				//Axis transition
+				this.drawLine(19,17500,19500);
+            }
+            
+            initializeState() {
+                this.initializeTransitions();
+                this.calculateState(-100); //Used later to trigger final state
+            }
+            
+            calculateState(currentTime) {
+				// Act as if at final state, but mask scrubber as if at t=0
+				this.maskScrubber = 0;
+				if (currentTime < 100) {
+					currentTime = 20000;
+					this.maskScrubber = 1;
+				}
+                this.currentTime = Math.max(0, Math.min(currentTime, this.duration));
+                
+                // Group transitions by element and attribute to handle overlaps
+                const activeTransitions = new Map();
+                
+                this.transitions.forEach(transition => {
+                    const key = `${transition.element}-${transition.attribute}`;
+                    
+                    if (currentTime < transition.startTime) {
+                        // Before transition starts
+                        if (!activeTransitions.has(key) || 
+                            activeTransitions.get(key).startTime > transition.startTime) {
+                            activeTransitions.set(key, {
+                                ...transition,
+                                currentValue: transition.startValue,
+                                progress: 0
+                            });
+                        }
+                    } else if (currentTime > transition.endTime) {
+                        // After transition ends
+                        if (!activeTransitions.has(key) || 
+                            activeTransitions.get(key).endTime < transition.endTime) {
+                            activeTransitions.set(key, {
+                                ...transition,
+                                currentValue: transition.endValue,
+                                progress: 1
+                            });
+                        }
+                    } else {
+                        // During transition
+                        const progress = (currentTime - transition.startTime) / 
+                                       (transition.endTime - transition.startTime);
+                        const currentValue = this.interpolateValue(
+                            transition.startValue, 
+                            transition.endValue, 
+                            progress
+                        );
+                        
+                        activeTransitions.set(key, {
+                            ...transition,
+                            currentValue: currentValue,
+                            progress: progress
+                        });
+                    }
+                });
+                
+                // Apply all transitions
+                activeTransitions.forEach(transition => {
+                    this.applyTransition(transition);
+                });
+                
+                this.updateUI();
+            }
+            
+            interpolateValue(startValue, endValue, progress) {
+                if (Array.isArray(startValue)) {
+                    return startValue.map((start, i) => 
+                        start + (endValue[i] - start) * progress
+                    );
+                }
+                return startValue + (endValue - startValue) * progress;
+            }
+            
+            applyTransition(transition) {
+                const elementData = this.elements.get(transition.element);
+                if (!elementData) return;
+                
+                const element = elementData.element;
+                
+                switch (transition.type) {
+                    case 'opacity':
+                        element.style('opacity', transition.currentValue);
+                        break;
+                        
+                    case 'line-draw':
+						element.attr('stroke-dashoffset', transition.currentValue);
+						break;
+                        
+                    case 'axis':
+                        this.handleAxisTransition(transition);
+                        break;
+                }
+            }
+            
+			handleAxisTransition(transition) {
+				const [minY, maxY] = transition.currentValue;
+				const isKeyMoment = Math.abs(this.currentTime - 16300) < 50 || Math.abs(this.currentTime - 16400) < 50;
+
+				// Update the y scale
+				this.scales.y = d3.scaleLinear()
+					.domain([minY, maxY])
+					.range([this.height, 0]);
+
+				// Update the y-axis
+				const yAxisGroup = this.elements.get('y-axis').element;
+				const yTicks = this.yAxis.scale(this.scales.y).ticks(6);
+				yAxisGroup.call(this.yAxis);
+				yAxisGroup.selectAll("path").remove();
+
+				// Update grid lines
+				const gridGroup = this.elements.get('grid').element;
+				gridGroup.selectAll('.y-grid')
+					.data(this.scales.y.ticks(6))
+					.attr('y1', d => this.scales.y(d))
+					.attr('y2', d => this.scales.y(d));
+
+				// Redraw all lines
+				this.data.forEach((series, i) => {
+					const elementData = this.elements.get(`line-${i}`);
+					if (!elementData) return;
+
+					const path = elementData.element;
+					const opacity = parseFloat(path.style('opacity') || 0);
+
+					if (i === 19 && isKeyMoment) {
+						//console.log(`Line 19 at ${this.currentTime}ms - Before: offset=${oldOffset}, oldLength=${oldTotalLength}, opacity=${opacity}`);
+					}
+
+					// Update the path
+					const newPath = this.line(series.values);
+					path.attr('d', newPath);
+					
+					// Update the corresponding label position
+					const labelData = this.elements.get(`label-${i}`);
+					if (labelData) {
+						const label = labelData.element;
+						const finalYValue = series.values[series.values.length - 1].y;
+						const newYPosition = this.scales.y(finalYValue);
+						
+						label.attr('y', newYPosition);
+					}
+
+					/*// Get new path length
+					const newTotalLength = path.node().getTotalLength();
+					elementData.totalLength = newTotalLength;
+
+					// Set new dasharray
+					path.attr('stroke-dasharray', `${newTotalLength} ${newTotalLength}`);
+
+					let newOffset;
+					if (opacity > 0 && oldOffset < oldTotalLength && oldTotalLength > 0) {
+						// Line is being drawn — preserve visual progress
+						const visualProgress = 1 - (oldOffset / oldTotalLength);
+						newOffset = (1 - visualProgress) * newTotalLength;
+					} else if (opacity > 0 && oldOffset >= 0 && oldOffset <= 1e-2) {
+						// Line is fully drawn
+						newOffset = 0;
+					} else {
+						// Hidden or not started yet
+						newOffset = newTotalLength;
+					}
+
+					path.attr('stroke-dashoffset', newOffset);*/
+
+					if (i === 19 && isKeyMoment) {
+						//console.log(`Line 19 at ${this.currentTime}ms - Set value: ${newOffset}, actual value=`, path.attr('stroke-dashoffset'));
+					}
+					
+				});
+				const labelData = this.elements.get('label-20');
+				if (labelData) {
+					const label = labelData.element;
+					const finalYValue = (this.data[9].values[this.data[9].values.length-1].y + this.data[10].values[this.data[10].values.length-1].y) / 2;
+					const newYPosition = this.scales.y(finalYValue);
+					
+					label.attr('y', newYPosition);
+					}
+			}
+
+            
+            updateUI() {
+				if (this.maskScrubber === 1) {
+					this.currentTime = 0;
+				}
+                const progress = this.currentTime / this.duration;
+                const scrubberProgress = document.getElementById('scrubberProgress');
+                const scrubberHandle = document.getElementById('scrubberHandle');
+                const timeDisplay = document.getElementById('timeDisplay');
+                
+                scrubberProgress.style.width = `${progress * 100}%`;
+                scrubberHandle.style.left = `${progress * 100}%`;
+                timeDisplay.textContent = `${(this.currentTime / 1000).toFixed(1)}s / 20.0s`;
+                
+                // Update play button
+                const playIcon = document.getElementById('playIcon');
+                const playText = document.getElementById('playText');
+                
+                if (this.isPlaying) {
+                    playIcon.textContent = '⏸';
+                } else {
+                    playIcon.textContent = '▶';
+                }
+            }
+            
+            play() {
+                if (this.currentTime >= this.duration) {
+                    this.restart();
+                    return;
+                }
+                
+                this.isPlaying = true;
+                this.isPaused = false;
+                this.startTimestamp = performance.now() - this.currentTime;
+                this.animate();
+                this.updateUI();
+            }
+            
+            pause() {
+                this.isPlaying = false;
+                this.isPaused = true;
+                this.pausedAt = this.currentTime;
+                this.updateUI();
+            }
+            
+            stop() {
+                this.isPlaying = false;
+                this.isPaused = false;
+                this.currentTime = 0;
+                this.pausedAt = 0;
+                //this.calculateState(-100); // Initialize state (before t=0)
+                //this.updateUI();
+				this.initializeState();
+            }
+            
+            restart() {
+                this.isPlaying = true;
+				this.isPaused = false;
+				this.currentTime = 0;
+                setTimeout(() => this.play(), 100);
+            }
+            
+            seekTo(time) {
+                const wasPlaying = this.isPlaying;
+                this.pause();
+                this.calculateState(time);
+                
+                if (wasPlaying && time < this.duration) {
+                    setTimeout(() => this.play(), 50);
+                }
+            }
+            
+            animate() {
+                if (!this.isPlaying) return;
+                
+                const now = performance.now();
+                this.currentTime = now - this.startTimestamp;
+                
+                if (this.currentTime >= this.duration) {
+                    this.currentTime = this.duration;
+                    this.isPlaying = false;
+                    this.calculateState(this.currentTime);
+                    this.updateUI();
+                    return;
+                }
+                
+                this.calculateState(this.currentTime);
+                this.updateUI();
+                
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+        
+        // Read data
+		let controller;
+		d3.csv("fig10t.csv").then(function(data) {
+			const colors = {
+				v1: "#0078AA", v5: "#4E944F", v10: "#B33030",
+				v11: "#B33030", v15: "#4E944F", v20: "#0078AA",
+				v2: "#B2B1B9", v3: "#B2B1B9", v4: "#B2B1B9",
+				v6: "#B2B1B9", v7: "#B2B1B9", v8: "#B2B1B9",
+				v9: "#B2B1B9", v12: "#B2B1B9", v13: "#B2B1B9",
+				v14: "#B2B1B9", v16: "#B2B1B9", v17: "#B2B1B9",
+				v18: "#B2B1B9", v19: "#B2B1B9"
+			};
+
+			const lineWidths = {
+				v1: 3, v5: 3, v10: 3, v11: 3, v15: 3, v20: 3,
+				v2: 1, v3: 1, v4: 1, v6: 1, v7: 1, v8: 1, v9: 1,
+				v12: 1, v13: 1, v14: 1, v16: 1, v17: 1, v18: 1, 
+				v19: 1
+			};
+		
+			// Initialize the result object with 20 variables
+			const result = [];
+		
+			// Process each row of data
+			data.forEach(function(row) {
+				const variableName = row.ventile; // Convert to number
+				
+				// For each year
+				tempData = [];
+				for (let year = 2000; year <= 2017; year++) {
+					const value = +row[year]; // Convert to number
+					
+					// Add object to the corresponding variable array
+					tempData.push({x: +year, y: +value},);
+				}
+				result.push({name: variableName,
+						color: colors[variableName],
+						linewidth: lineWidths[variableName],
+						values: tempData
+				});
+			});
+			
+			// Initialize the animation controller
+			controller = new AnimationController(result);
+			
+		}).catch(function(error) {
+			console.error("Error loading CSV:", error);
+		});
+		
+		// printed from console.log(JSON.stringify(controller.data));
+		/*result = [{"name":"v1","color":"#0078AA","linewidth":3,"values":[{"x":2000,"y":4.3},{"x":2001,"y":3.6},{"x":2002,"y":3.3},{"x":2003,"y":3.6},{"x":2004,"y":4},{"x":2005,"y":5.2},{"x":2006,"y":5.8},{"x":2007,"y":7.2},{"x":2008,"y":7.7},{"x":2009,"y":8.6},{"x":2010,"y":9.1},{"x":2011,"y":9.4},{"x":2012,"y":9.5},{"x":2013,"y":9.5},{"x":2014,"y":9.6},{"x":2015,"y":9.7},{"x":2016,"y":9.6},{"x":2017,"y":9.5}]},{"name":"v2","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":10.4},{"x":2001,"y":9.8},{"x":2002,"y":9.6},{"x":2003,"y":9.4},{"x":2004,"y":9.6},{"x":2005,"y":10},{"x":2006,"y":10.3},{"x":2007,"y":10.8},{"x":2008,"y":11.2},{"x":2009,"y":11.7},{"x":2010,"y":11.8},{"x":2011,"y":11.7},{"x":2012,"y":11.6},{"x":2013,"y":11.6},{"x":2014,"y":11.5},{"x":2015,"y":11.6},{"x":2016,"y":11.4},{"x":2017,"y":11.1}]},{"name":"v3","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":14.1},{"x":2001,"y":13.6},{"x":2002,"y":13.5},{"x":2003,"y":13.2},{"x":2004,"y":13.3},{"x":2005,"y":13.8},{"x":2006,"y":14.2},{"x":2007,"y":14.7},{"x":2008,"y":15.1},{"x":2009,"y":15.6},{"x":2010,"y":15.9},{"x":2011,"y":15.6},{"x":2012,"y":15.5},{"x":2013,"y":15.3},{"x":2014,"y":15.2},{"x":2015,"y":15.2},{"x":2016,"y":14.9},{"x":2017,"y":14.4}]},{"name":"v4","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":17.4},{"x":2001,"y":16.9},{"x":2002,"y":16.9},{"x":2003,"y":16.7},{"x":2004,"y":16.8},{"x":2005,"y":17.2},{"x":2006,"y":17.6},{"x":2007,"y":18},{"x":2008,"y":18.3},{"x":2009,"y":18.8},{"x":2010,"y":19},{"x":2011,"y":19},{"x":2012,"y":19.1},{"x":2013,"y":18.7},{"x":2014,"y":18.4},{"x":2015,"y":18.4},{"x":2016,"y":17.9},{"x":2017,"y":17.4}]},{"name":"v5","color":"#4E944F","linewidth":3,"values":[{"x":2000,"y":20.1},{"x":2001,"y":19.7},{"x":2002,"y":19.7},{"x":2003,"y":19.6},{"x":2004,"y":19.7},{"x":2005,"y":20},{"x":2006,"y":20.4},{"x":2007,"y":20.9},{"x":2008,"y":21.3},{"x":2009,"y":21.8},{"x":2010,"y":22},{"x":2011,"y":21.9},{"x":2012,"y":21.7},{"x":2013,"y":21.3},{"x":2014,"y":21.1},{"x":2015,"y":21.2},{"x":2016,"y":20.7},{"x":2017,"y":20.2}]},{"name":"v6","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":22.9},{"x":2001,"y":22.3},{"x":2002,"y":22.3},{"x":2003,"y":22.2},{"x":2004,"y":22.3},{"x":2005,"y":22.6},{"x":2006,"y":22.9},{"x":2007,"y":23.3},{"x":2008,"y":23.4},{"x":2009,"y":23.9},{"x":2010,"y":24.1},{"x":2011,"y":24.1},{"x":2012,"y":24},{"x":2013,"y":23.5},{"x":2014,"y":23.2},{"x":2015,"y":23.3},{"x":2016,"y":22.9},{"x":2017,"y":22.3}]},{"name":"v7","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":25.5},{"x":2001,"y":24.9},{"x":2002,"y":24.8},{"x":2003,"y":24.7},{"x":2004,"y":24.8},{"x":2005,"y":24.9},{"x":2006,"y":25.2},{"x":2007,"y":25.7},{"x":2008,"y":25.6},{"x":2009,"y":26.1},{"x":2010,"y":26.3},{"x":2011,"y":26.5},{"x":2012,"y":26.4},{"x":2013,"y":25.8},{"x":2014,"y":25.2},{"x":2015,"y":25.4},{"x":2016,"y":25.1},{"x":2017,"y":24.5}]},{"name":"v8","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":27.9},{"x":2001,"y":27.3},{"x":2002,"y":27.3},{"x":2003,"y":27.3},{"x":2004,"y":27.3},{"x":2005,"y":27.3},{"x":2006,"y":27.7},{"x":2007,"y":28.2},{"x":2008,"y":28},{"x":2009,"y":28.3},{"x":2010,"y":28.6},{"x":2011,"y":28.6},{"x":2012,"y":28.5},{"x":2013,"y":27.9},{"x":2014,"y":27.7},{"x":2015,"y":27.8},{"x":2016,"y":27.3},{"x":2017,"y":26.8}]},{"name":"v9","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":30.5},{"x":2001,"y":29.9},{"x":2002,"y":29.9},{"x":2003,"y":29.7},{"x":2004,"y":29.8},{"x":2005,"y":29.9},{"x":2006,"y":29.8},{"x":2007,"y":30.2},{"x":2008,"y":29.9},{"x":2009,"y":30.2},{"x":2010,"y":30.3},{"x":2011,"y":30.4},{"x":2012,"y":30.3},{"x":2013,"y":29.7},{"x":2014,"y":29.4},{"x":2015,"y":29.9},{"x":2016,"y":29.2},{"x":2017,"y":28.6}]},{"name":"v10","color":"#B33030","linewidth":3,"values":[{"x":2000,"y":33.3},{"x":2001,"y":32.6},{"x":2002,"y":32.5},{"x":2003,"y":32.3},{"x":2004,"y":32.3},{"x":2005,"y":32.3},{"x":2006,"y":32.4},{"x":2007,"y":32.7},{"x":2008,"y":32.1},{"x":2009,"y":32.5},{"x":2010,"y":32.6},{"x":2011,"y":32.4},{"x":2012,"y":32.5},{"x":2013,"y":31.9},{"x":2014,"y":31.5},{"x":2015,"y":31.8},{"x":2016,"y":31.4},{"x":2017,"y":30.8}]},{"name":"v11","color":"#B33030","linewidth":3,"values":[{"x":2000,"y":36},{"x":2001,"y":35.3},{"x":2002,"y":35.2},{"x":2003,"y":35},{"x":2004,"y":35.1},{"x":2005,"y":35},{"x":2006,"y":35.1},{"x":2007,"y":35.3},{"x":2008,"y":34.7},{"x":2009,"y":34.9},{"x":2010,"y":34.7},{"x":2011,"y":34.7},{"x":2012,"y":34.8},{"x":2013,"y":34.1},{"x":2014,"y":33.7},{"x":2015,"y":34.1},{"x":2016,"y":33.6},{"x":2017,"y":33.1}]},{"name":"v12","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":38.8},{"x":2001,"y":38.1},{"x":2002,"y":38.2},{"x":2003,"y":38.1},{"x":2004,"y":38.1},{"x":2005,"y":37.9},{"x":2006,"y":37.9},{"x":2007,"y":38.3},{"x":2008,"y":37.1},{"x":2009,"y":36.9},{"x":2010,"y":37},{"x":2011,"y":36.8},{"x":2012,"y":36.9},{"x":2013,"y":36.1},{"x":2014,"y":35.8},{"x":2015,"y":36.2},{"x":2016,"y":35.8},{"x":2017,"y":35.3}]},{"name":"v13","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":41.9},{"x":2001,"y":41.1},{"x":2002,"y":41.2},{"x":2003,"y":41.4},{"x":2004,"y":41.2},{"x":2005,"y":40.9},{"x":2006,"y":40.7},{"x":2007,"y":41},{"x":2008,"y":39.6},{"x":2009,"y":39.4},{"x":2010,"y":38.9},{"x":2011,"y":38.9},{"x":2012,"y":38.9},{"x":2013,"y":38.1},{"x":2014,"y":37.8},{"x":2015,"y":38.1},{"x":2016,"y":38},{"x":2017,"y":37.5}]},{"name":"v14","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":45.3},{"x":2001,"y":44.5},{"x":2002,"y":44.5},{"x":2003,"y":44.7},{"x":2004,"y":44.6},{"x":2005,"y":44.3},{"x":2006,"y":44.1},{"x":2007,"y":44.4},{"x":2008,"y":42.9},{"x":2009,"y":42.7},{"x":2010,"y":42.7},{"x":2011,"y":42.2},{"x":2012,"y":42.3},{"x":2013,"y":41.2},{"x":2014,"y":40.8},{"x":2015,"y":41.2},{"x":2016,"y":41.2},{"x":2017,"y":40.7}]},{"name":"v15","color":"#4E944F","linewidth":3,"values":[{"x":2000,"y":49.5},{"x":2001,"y":48.7},{"x":2002,"y":48.8},{"x":2003,"y":49},{"x":2004,"y":48.8},{"x":2005,"y":48.4},{"x":2006,"y":48.2},{"x":2007,"y":48.4},{"x":2008,"y":46.5},{"x":2009,"y":46.3},{"x":2010,"y":45.8},{"x":2011,"y":45},{"x":2012,"y":45.1},{"x":2013,"y":43.7},{"x":2014,"y":43.4},{"x":2015,"y":44.1},{"x":2016,"y":43.8},{"x":2017,"y":43.4}]},{"name":"v16","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":54.2},{"x":2001,"y":53.5},{"x":2002,"y":53.4},{"x":2003,"y":53.9},{"x":2004,"y":53.7},{"x":2005,"y":53},{"x":2006,"y":53.1},{"x":2007,"y":53.3},{"x":2008,"y":50.7},{"x":2009,"y":50},{"x":2010,"y":49.9},{"x":2011,"y":49.4},{"x":2012,"y":49.2},{"x":2013,"y":48},{"x":2014,"y":47.4},{"x":2015,"y":48.3},{"x":2016,"y":48.3},{"x":2017,"y":47.9}]},{"name":"v17","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":60.9},{"x":2001,"y":60.1},{"x":2002,"y":59.9},{"x":2003,"y":60.3},{"x":2004,"y":60.4},{"x":2005,"y":59.6},{"x":2006,"y":59.2},{"x":2007,"y":59.5},{"x":2008,"y":56.5},{"x":2009,"y":55.8},{"x":2010,"y":55},{"x":2011,"y":54.1},{"x":2012,"y":53.8},{"x":2013,"y":52.9},{"x":2014,"y":52.5},{"x":2015,"y":53.4},{"x":2016,"y":53.2},{"x":2017,"y":52.9}]},{"name":"v18","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":70.5},{"x":2001,"y":69.7},{"x":2002,"y":69.3},{"x":2003,"y":70},{"x":2004,"y":70.1},{"x":2005,"y":68.3},{"x":2006,"y":68.2},{"x":2007,"y":68.3},{"x":2008,"y":63.7},{"x":2009,"y":62},{"x":2010,"y":61.1},{"x":2011,"y":60.5},{"x":2012,"y":60.8},{"x":2013,"y":59.5},{"x":2014,"y":59.6},{"x":2015,"y":60.6},{"x":2016,"y":60.8},{"x":2017,"y":60.1}]},{"name":"v19","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":89.6},{"x":2001,"y":87.5},{"x":2002,"y":86.4},{"x":2003,"y":86.5},{"x":2004,"y":87.8},{"x":2005,"y":85.7},{"x":2006,"y":85.7},{"x":2007,"y":85.7},{"x":2008,"y":77.7},{"x":2009,"y":73.6},{"x":2010,"y":72.6},{"x":2011,"y":71.1},{"x":2012,"y":70.7},{"x":2013,"y":69.6},{"x":2014,"y":69.5},{"x":2015,"y":71.2},{"x":2016,"y":70.3},{"x":2017,"y":70.6}]},{"name":"v20","color":"#0078AA","linewidth":3,"values":[{"x":2000,"y":162.6},{"x":2001,"y":151.9},{"x":2002,"y":147},{"x":2003,"y":149.4},{"x":2004,"y":153.2},{"x":2005,"y":146.4},{"x":2006,"y":147.7},{"x":2007,"y":148.5},{"x":2008,"y":124.4},{"x":2009,"y":111},{"x":2010,"y":111.4},{"x":2011,"y":107.4},{"x":2012,"y":109.7},{"x":2013,"y":103.4},{"x":2014,"y":105.6},{"x":2015,"y":107.2},{"x":2016,"y":105.9},{"x":2017,"y":108.5}]}];
+		let controller = new AnimationController(result);*/
+    </script>
+</body>
+</html>
