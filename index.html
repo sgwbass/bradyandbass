@@ -51,7 +51,7 @@
     <script>
         class AnimationController {
             constructor(data, duration = 20000, transitions = [], elements = new Map(), x = {min: 2000, max: 2017}, y = {min: 0, max: 100},
-				chartWidth = 800, chartHeight = 400) {
+				chartWidth = 800, chartHeight = 400, startFromFinal = true, chartID = "#chart") {
 				this.data = data;
                 this.duration = duration; // milliseconds
 				this.durationSeconds = (this.duration / 1000).toFixed(1); // for display under scrubber
@@ -62,6 +62,12 @@
 				this.y = y;
 				this.chartWidth = chartWidth;
 				this.chartHeight = chartHeight;
+				this.chartID = chartID;
+				
+				this.initializeTime = 0;
+				if (startFromFinal) {
+					this.initializeTime = -100;
+				}
 				
                 this.currentTime = 0;
                 this.isPlaying = false;
@@ -80,7 +86,7 @@
                 const width = this.chartWidth - margin.left - margin.right;
                 const height = this.chartHeight - margin.top - margin.bottom;
                 
-                const svg = d3.select("#chart")
+                const svg = d3.select(this.chartID)
                     .append("svg")
                     .attr("width", width + margin.left + margin.right)
                     .attr("height", height + margin.top + margin.bottom);
@@ -157,7 +163,7 @@
                     .attr("y", 38)
                     .style("text-anchor", "end")
                     .text("Year");
-                
+					
                 /*yAxisGroup.append("text")
                     .attr("class", "axis-label")
                     .attr("transform", "rotate(-90)")
@@ -173,11 +179,13 @@
                 
                 // Create lines
                 this.data.forEach((series, i) => {
+					//console.log(series);
 					//if (i===1) {console.log(series.values[series.values.length-1].x, series.values[series.values.length-1].y);};
 						const path = g.append("path")
 							.datum(series.values)
 							.attr("class", `data-line line-${i}`)
 							.attr("d", this.line)
+							.attr("plot-type", "line")
 							.style("stroke", series.color)
 							.style("stroke-width", series.linewidth)
 							.style("opacity", 1);
@@ -229,6 +237,50 @@
 				this.elements.set('label-20', {
 					element: textLabel
 				});
+					
+				// Tooltip element
+				const tooltip = g.append('g')
+					.attr('class', 'tooltip')
+					.style('opacity', 0)
+					.style('pointer-events', 'none');
+
+				// Tooltip background
+				const tooltipBg = tooltip.append('rect')
+					.attr('class', 'tooltip-bg')
+					.attr('rx', 4)
+					.attr('ry', 4)
+					.style('fill', 'white')
+					.style('stroke', '#e2e8f0')
+					.style('stroke-width', 1)
+					.style('opacity', 0.9);
+
+				// Tooltip content container
+				const tooltipContent = tooltip.append('g')
+					.attr('class', 'tooltip-content');
+
+				this.elements.set('tooltip', { element: tooltip });
+				
+				const mouseOverlay = g.append('rect')
+					.attr('width', width)
+					.attr('height', height)
+					.style('fill', 'none')
+					.style('pointer-events', 'all')
+					.on('mousemove', (event) => this.handleMouseMove(event))
+					.on('mouseenter', () => this.showTooltip())
+					.on('mouseleave', () => this.hideTooltip());
+					
+				const keyVentiles = [0, 4, 9, 10, 14, 19]; // line indices
+				keyVentiles.forEach(i => {
+					const dot = g.append('circle')
+						.attr('class', `line-dot dot-${i}`)
+						.attr('r', 4)
+						.style('fill', this.data[i].color)
+						.style('stroke', 'white')
+						.style('stroke-width', 2)
+						.style('opacity', 0);
+					
+					this.elements.set(`dot-${i}`, { element: dot });
+				});
                 
                 // Create annotation
                 const annotation1 = g.append('foreignObject')
@@ -259,8 +311,150 @@
                 this.chartArea = g;
                 this.width = width;
                 this.height = height;
+				
+				// Make sure other elements don't interfere with mouse movements
+				this.chartArea.selectAll("*")
+				  .filter(function() { return this !== mouseOverlay.node(); })
+				  .style("pointer-events", "none");
             }
             
+			handleMouseMove(event) {
+				if (this.isPlaying || this.isPaused) return; // Only show when stopped
+				
+				const [mouseX, mouseY] = d3.pointer(event);
+				
+				// Convert mouse X to data X value
+				const xValue = this.scales.x.invert(mouseX);
+				
+				// Find nearest year (round to nearest integer)
+				const nearestYear = Math.round(xValue);
+				
+				// Clamp to data range
+				const clampedYear = Math.max(2000, Math.min(2017, nearestYear));
+				
+				//console.log(mouseX, mouseY, xValue, nearestYear, clampedYear);
+				
+				// Update tooltip content and position
+				this.updateTooltip(clampedYear, mouseX, mouseY);
+			}
+			
+			updateTooltip(year, mouseX, mouseY) {
+				const keyVentiles = [
+					{ index: 19, label: 'Ventile 20' }, // Top ventile first
+					{ index: 14, label: 'Ventile 15' },
+					{ index: 10, label: 'Ventile 11' },
+					{ index: 9, label: 'Ventile 10' },
+					{ index: 4, label: 'Ventile 5' },
+					{ index: 0, label: 'Ventile 1' }
+				];
+				
+				const tooltip = this.elements.get('tooltip').element;
+				const tooltipContent = tooltip.select('.tooltip-content');
+				
+				// Clear existing content
+				tooltipContent.selectAll('*').remove();
+				
+				//Add year
+				tooltipContent.append('text')
+					.attr('x', 8)
+					.attr('y', 12)
+					.style('font-size', '13px')
+					.style('font-weight', '600')
+					.text(`${year}`);
+				
+				// Add entries for each ventile
+				keyVentiles.forEach((ventile, i) => {
+					const series = this.data[ventile.index];
+					const dataPoint = series.values.find(d => d.x === year);
+					const value = dataPoint ? dataPoint.y : 0;
+					
+					const yPos = (i+1) * 18 + 12; // Spacing between entries
+					
+					// Color line indicator
+					tooltipContent.append('line')
+						.attr('x1', 8)
+						.attr('x2', 20)
+						.attr('y1', yPos - 2)
+						.attr('y2', yPos - 2)
+						.style('stroke', series.color)
+						.style('stroke-width', 3);
+					
+					// Label and value text
+					tooltipContent.append('text')
+						.attr('x', 25)
+						.attr('y', yPos)
+						.style('font-size', '12px')
+						.text(`${ventile.label}: $${value.toFixed(1)}`);
+					
+					// Update corresponding dot position
+					const dotElement = this.elements.get(`dot-${ventile.index}`);
+					if (dotElement && dataPoint) {
+						dotElement.element
+							.attr('cx', this.scales.x(year))
+							.attr('cy', this.scales.y(dataPoint.y))
+							.style('opacity', 1);
+					}
+				});
+				
+				// Position tooltip
+				this.positionTooltip(mouseX, mouseY, tooltipContent);
+			}
+			
+			positionTooltip(mouseX, mouseY, tooltipContent) {
+				const tooltip = this.elements.get('tooltip').element;
+				const tooltipBg = tooltip.select('.tooltip-bg');
+				
+				// Calculate tooltip dimensions
+				const bbox = tooltipContent.node().getBBox();
+				const padding = 8;
+				const tooltipWidth = bbox.width + padding * 2;
+				const tooltipHeight = bbox.height + padding * 2;
+				
+				// Position to avoid going off screen
+				let tooltipX = mouseX + 15;
+				let tooltipY = mouseY - tooltipHeight / 2;
+				
+				// Adjust if tooltip would go off right edge
+				if (tooltipX + tooltipWidth > this.width) {
+					tooltipX = mouseX - tooltipWidth - 15;
+				}
+				
+				// Adjust if tooltip would go off top/bottom
+				if (tooltipY < 0) tooltipY = 5;
+				if (tooltipY + tooltipHeight > this.height) {
+					tooltipY = this.height - tooltipHeight - 5;
+				}
+				
+				// Update tooltip position and background
+				tooltip.attr('transform', `translate(${tooltipX}, ${tooltipY})`);
+				tooltipBg
+					.attr('width', tooltipWidth)
+					.attr('height', tooltipHeight)
+					.attr('x', -padding)
+					.attr('y', -padding);
+			}
+			
+			showTooltip() {
+				if (this.isPlaying || this.isPaused) return;
+				
+				const tooltip = this.elements.get('tooltip').element;
+				tooltip.style('opacity', 1);
+			}
+
+			hideTooltip() {
+				const tooltip = this.elements.get('tooltip').element;
+				tooltip.style('opacity', 0);
+				
+				// Hide all dots
+				const keyVentiles = [0, 4, 9, 10, 14, 19];
+				keyVentiles.forEach(i => {
+					const dotElement = this.elements.get(`dot-${i}`);
+					if (dotElement) {
+						dotElement.element.style('opacity', 0);
+					}
+				});
+			}
+			
             setupControls() {
                 const playBtn = document.getElementById('playBtn');
                 const stopBtn = document.getElementById('stopBtn');
@@ -357,12 +551,12 @@
 				});
 			}
 			
-            initializeTransitions() {
+            /*initializeTransitions() {
                 
-            }
+            }*/
             
             initializeState() {
-				this.calculateState(-100); //Used later to trigger final state
+				this.calculateState(this.initializeTime); //Used later to trigger final state
             }
             
             calculateState(currentTime) {
@@ -568,6 +762,7 @@
             }
             
             play() {
+				this.hideTooltip();
                 if (this.currentTime >= this.duration) {
                     this.restart();
                     return;
@@ -580,6 +775,7 @@
             }
             
             pause() {
+				this.hideTooltip();
                 this.isPlaying = false;
                 this.isPaused = true;
                 this.pausedAt = this.currentTime;
@@ -683,7 +879,6 @@
 				const data = await loadData();
 				
 				controller = new AnimationController(data, 20000);
-				controller.initializeState();
 				controller.drawLine(0,100,2100);
 				controller.drawLine(1,2600,2600);
 				controller.drawLine(2,3100,3100);
@@ -760,7 +955,6 @@
                         endValue: [0, 165],
                         type: 'axis'
                     });
-				controller.initializeState()
 				controller.initializeState()
 				return controller;
 			} catch (error) {
