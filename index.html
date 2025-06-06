@@ -35,7 +35,7 @@
                     <div class="scrubber-progress" id="scrubberProgress"></div>
                     <div class="scrubber-handle" id="scrubberHandle"></div>
                 </div>
-                <div class="time-display" id="timeDisplay">0.0s / 20.0s</div>
+                <div class="time-display" id="timeDisplay">0.0s</div>
             </div>
         </div>
         <div class="chart-notes">
@@ -50,32 +50,35 @@
 
     <script>
         class AnimationController {
-            constructor(data) {
-                this.duration = 20000; // 20 seconds
+            constructor(data, duration = 20000, transitions = [], elements = new Map(), x = {min: 2000, max: 2017}, y = {min: 0, max: 100},
+				chartWidth = 800, chartHeight = 400) {
+				this.data = data;
+                this.duration = duration; // milliseconds
+				this.durationSeconds = (this.duration / 1000).toFixed(1); // for display under scrubber
+				this.transitions = transitions;
+				this.elements = elements;
+				
+				this.x = x; 
+				this.y = y;
+				this.chartWidth = chartWidth;
+				this.chartHeight = chartHeight;
+				
                 this.currentTime = 0;
                 this.isPlaying = false;
                 this.isPaused = false;
                 this.startTimestamp = null;
                 this.pausedAt = 0;
 				this.maskScrubber = 0;
-                this.transitions = [];
-                this.elements = new Map();
-                this.scales = {
-                    x: null,
-                    y: null,
-                    initialY: null
-                };
-
-				this.data = data;
+                
                 this.setupChart();
                 this.setupControls();
-                this.initializeState();
+                //this.initializeState();
             }
             
             setupChart() {
                 const margin = { top: 20, right: 30, bottom: 50, left: 60 };
-                const width = 800 - margin.left - margin.right;
-                const height = 400 - margin.top - margin.bottom;
+                const width = this.chartWidth - margin.left - margin.right;
+                const height = this.chartHeight - margin.top - margin.bottom;
                 
                 const svg = d3.select("#chart")
                     .append("svg")
@@ -86,9 +89,13 @@
                     .attr("transform", `translate(${margin.left},${margin.top})`);
                 
                 // Create scales
-                this.scales.x = d3.scaleLinear().domain([2000, 2017]).range([20, width-20]);
-                this.scales.initialY = d3.scaleLinear().domain([0, 50]).range([height, 0]);
-                this.scales.y = this.scales.initialY.copy();
+				this.scales = {
+                    x: null,
+                    y: null
+                };
+                this.scales.x = d3.scaleLinear().domain([this.x.min, this.x.max]).range([width*0.025, width*0.975]);
+                // Axis update is currently overriding the initial y values and using the first transition start values
+				this.scales.y = d3.scaleLinear().domain([this.y.min, this.y.max]).range([height, 0]);
                 
                 // Create axes
 				const parseDate = d3.timeFormat("’%y")
@@ -300,7 +307,7 @@
                 });
             }
 
-			drawLine(lineNumber,startTime,endTime) {
+			drawLine(lineNumber,startTime,endTime,labelRight=true) {
 				this.transitions.push({
 					id: 'line-' + lineNumber + '-draw', 
 					element: 'line-' + lineNumber, 
@@ -321,16 +328,18 @@
 					endValue: 1,
 					type: 'opacity'
 				});
-				this.transitions.push({
-					id: 'label-' + lineNumber + '-opacity', 
-					element: 'label-' + lineNumber, 
-					attribute: 'opacity', 
-					startTime: startTime, 
-					endTime: startTime+20, 
-					startValue: 0, 
-					endValue: 1,
-					type: 'opacity'
-				});
+				if (labelRight) {
+					this.transitions.push({
+						id: 'label-' + lineNumber + '-opacity', 
+						element: 'label-' + lineNumber, 
+						attribute: 'opacity', 
+						startTime: startTime, 
+						endTime: startTime+20, 
+						startValue: 0, 
+						endValue: 1,
+						type: 'opacity'
+					});
+				}
 			}
 			
 			removeLabels(labelList, startTime, endTime) {
@@ -349,95 +358,18 @@
 			}
 			
             initializeTransitions() {
-                this.transitions = [
-                    { 
-                        id: 'annotation-in', 
-                        element: 'annotation1', 
-                        attribute: 'opacity', 
-                        startTime: 100, 
-                        endTime: 600, 
-                        startValue: 0, 
-                        endValue: 1,
-                        type: 'opacity'
-                    },
-                    { 
-                        id: 'annotation-out', 
-                        element: 'annotation1', 
-                        attribute: 'opacity', 
-                        startTime: 5900, 
-                        endTime: 6400, 
-                        startValue: 0.7, 
-                        endValue: 0,
-                        type: 'opacity'
-                    },
-                    
-                    { 
-                        id: 'y-axis-scale', 
-                        element: 'y-axis', 
-                        attribute: 'scale', 
-                        startTime: 13700, 
-                        endTime: 14700, 
-                        startValue: [0, 50], 
-                        endValue: [0, 100],
-                        type: 'axis'
-                    },
-                    { 
-                        id: 'label-20-draw', 
-                        element: 'label-20', 
-                        attribute: 'opacity', 
-                        startTime: 13700, 
-                        endTime: 14700, 
-                        startValue: 0, 
-                        endValue: 1,
-                        type: 'opacity'
-                    },
-                    { 
-                        id: 'y-axis-scale', 
-                        element: 'y-axis', 
-                        attribute: 'scale', 
-                        startTime: 16400, 
-                        endTime: 17400, 
-                        startValue: [0, 100], 
-                        endValue: [0, 165],
-                        type: 'axis'
-                    }
-                ];
-				this.drawLine(0,100,2100);
-				this.drawLine(1,2600,2600);
-				this.drawLine(2,3100,3100);
-				this.drawLine(3,3600,3600);
-				this.drawLine(4,4100,6100);
-				this.drawLine(5,6600,6600);
-				this.drawLine(6,7100,7100);
-				this.drawLine(7,7600,7600);
-				this.drawLine(8,8100,8100);
-				this.drawLine(9,8600,9600);
-				this.drawLine(10,8600,9600);
-				this.drawLine(11,10100,10100);
-				this.drawLine(12,10600,10600);
-				this.drawLine(13,11100,11100);
-				this.drawLine(14,11600,13600);
-				this.removeLabels([1,2,3,5,6,7,8,9,10,11,12,13],13700,14700);
-				//Axis transition
-				this.drawLine(15,14800,14800);
-				this.drawLine(16,15300,15300);
-				this.drawLine(17,15800,15800);
-				this.drawLine(18,16300,16300);
-				this.removeLabels([15,16,17,18],16400,17400);
-				//Axis transition
-				this.drawLine(19,17500,19500);
+                
             }
             
             initializeState() {
-                this.initializeTransitions();
-                this.calculateState(-100); //Used later to trigger final state
+				controller.calculateState(-100); //Used later to trigger final state
             }
             
             calculateState(currentTime) {
 				// Act as if at final state, but mask scrubber as if at t=0
 				this.maskScrubber = 0;
 				if (currentTime < 0) {
-					currentTime = 20000;
+					currentTime = this.duration;
 					this.maskScrubber = 1;
 				}
                 this.currentTime = Math.max(0, Math.min(currentTime, this.duration));
@@ -622,7 +554,7 @@
                 
                 scrubberProgress.style.width = `${progress * 100}%`;
                 scrubberHandle.style.left = `${progress * 100}%`;
-                timeDisplay.textContent = `${(this.currentTime / 1000).toFixed(1)}s / 20.0s`;
+                timeDisplay.textContent = `${(this.currentTime / 1000).toFixed(1)}s / ${this.durationSeconds}s`;
                 
                 // Update play button
                 const playIcon = document.getElementById('playIcon');
@@ -659,7 +591,6 @@
                 this.isPaused = false;
                 this.currentTime = 0;
                 this.pausedAt = 0;
-                //this.calculateState(-100); // Initialize state (before t=0)
                 //this.updateUI();
 				this.initializeState();
             }
@@ -702,53 +633,142 @@
         }
         
         // Read data
-		let controller;
-		d3.csv("fig10t.csv").then(function(data) {
-			const colors = {
-				v1: "#0078AA", v5: "#4E944F", v10: "#B33030",
-				v11: "#B33030", v15: "#4E944F", v20: "#0078AA",
-				v2: "#B2B1B9", v3: "#B2B1B9", v4: "#B2B1B9",
-				v6: "#B2B1B9", v7: "#B2B1B9", v8: "#B2B1B9",
-				v9: "#B2B1B9", v12: "#B2B1B9", v13: "#B2B1B9",
-				v14: "#B2B1B9", v16: "#B2B1B9", v17: "#B2B1B9",
-				v18: "#B2B1B9", v19: "#B2B1B9"
-			};
+		function loadData() {
+			return d3.csv("fig10t.csv").then(function(data) {
+				const colors = {
+					v1: "#0078AA", v5: "#4E944F", v10: "#B33030",
+					v11: "#B33030", v15: "#4E944F", v20: "#0078AA",
+					v2: "#B2B1B9", v3: "#B2B1B9", v4: "#B2B1B9",
+					v6: "#B2B1B9", v7: "#B2B1B9", v8: "#B2B1B9",
+					v9: "#B2B1B9", v12: "#B2B1B9", v13: "#B2B1B9",
+					v14: "#B2B1B9", v16: "#B2B1B9", v17: "#B2B1B9",
+					v18: "#B2B1B9", v19: "#B2B1B9"
+				};
 
-			const lineWidths = {
-				v1: 3, v5: 3, v10: 3, v11: 3, v15: 3, v20: 3,
-				v2: 1, v3: 1, v4: 1, v6: 1, v7: 1, v8: 1, v9: 1,
-				v12: 1, v13: 1, v14: 1, v16: 1, v17: 1, v18: 1, 
-				v19: 1
-			};
-		
-			// Initialize the result object with 20 variables
-			const result = [];
-		
-			// Process each row of data
-			data.forEach(function(row) {
-				const variableName = row.ventile; // Convert to number
-				
-				// For each year
-				tempData = [];
-				for (let year = 2000; year <= 2017; year++) {
-					const value = +row[year]; // Convert to number
+				const lineWidths = {
+					v1: 3, v5: 3, v10: 3, v11: 3, v15: 3, v20: 3,
+					v2: 1, v3: 1, v4: 1, v6: 1, v7: 1, v8: 1, v9: 1,
+					v12: 1, v13: 1, v14: 1, v16: 1, v17: 1, v18: 1, 
+					v19: 1
+				};
+			
+				// Initialize the result object with 20 variables
+				const result = [];
+			
+				// Process each row of data
+				data.forEach(function(row) {
+					const variableName = row.ventile; // Convert to number
 					
-					// Add object to the corresponding variable array
-					tempData.push({x: +year, y: +value},);
-				}
-				result.push({name: variableName,
+					// For each year
+					tempData = [];
+					for (let year = 2000; year <= 2017; year++) {
+						const value = +row[year]; // Convert to number
+						
+						// Add object to the corresponding variable array
+						tempData.push({x: +year, y: +value},);
+					}
+					result.push({name: variableName,
 						color: colors[variableName],
 						linewidth: lineWidths[variableName],
 						values: tempData
+					});
 				});
+				return result;
 			});
-			
-			// Initialize the animation controller
-			controller = new AnimationController(result);
-			
-		}).catch(function(error) {
-			console.error("Error loading CSV:", error);
-		});
+		}
+		
+		// Animation initialization (outside the data loading)
+		async function initializeAnimation() {
+			try {
+				const data = await loadData();
+				
+				controller = new AnimationController(data, 20000);
+				controller.initializeState();
+				controller.drawLine(0,100,2100);
+				controller.drawLine(1,2600,2600);
+				controller.drawLine(2,3100,3100);
+				controller.drawLine(3,3600,3600);
+				controller.drawLine(4,4100,6100);
+				controller.drawLine(5,6600,6600);
+				controller.drawLine(6,7100,7100);
+				controller.drawLine(7,7600,7600);
+				controller.drawLine(8,8100,8100);
+				controller.drawLine(9,8600,10600);
+				controller.drawLine(10,8600,10600);
+				controller.drawLine(11,11100,11100);
+				controller.drawLine(12,11600,11600);
+				controller.drawLine(13,12100,12100);
+				controller.drawLine(14,12600,14600);
+				controller.removeLabels([1,2,3,5,6,7,8,9,10,11,12,13],14700,15400);
+				//Axis transition
+				controller.drawLine(15,15500,15500);
+				controller.drawLine(16,16000,16000);
+				controller.drawLine(17,16500,16500);
+				controller.drawLine(18,17000,17000);
+				controller.removeLabels([15,16,17,18],17100,17800);
+				//Axis transition
+				controller.drawLine(19,17900,19900);
+				controller.transitions.push(
+                    { 
+                        id: 'annotation-in', 
+                        element: 'annotation1', 
+                        attribute: 'opacity', 
+                        startTime: 100, 
+                        endTime: 600, 
+                        startValue: 0, 
+                        endValue: 1,
+                        type: 'opacity'
+                    },
+                    { 
+                        id: 'annotation-out', 
+                        element: 'annotation1', 
+                        attribute: 'opacity', 
+                        startTime: 5900, 
+                        endTime: 6400, 
+                        startValue: 0.7, 
+                        endValue: 0,
+                        type: 'opacity'
+                    },
+                    
+                    { 
+                        id: 'y-axis-scale', 
+                        element: 'y-axis', 
+                        attribute: 'scale', 
+                        startTime: 14700, 
+                        endTime: 15400, 
+                        startValue: [0, 50], 
+                        endValue: [0, 100],
+                        type: 'axis'
+                    },
+                    { 
+                        id: 'label-20-draw', 
+                        element: 'label-20', 
+                        attribute: 'opacity', 
+                        startTime: 14700, 
+                        endTime: 15400, 
+                        startValue: 0, 
+                        endValue: 1,
+                        type: 'opacity'
+                    },
+                    { 
+                        id: 'y-axis-scale', 
+                        element: 'y-axis', 
+                        attribute: 'scale', 
+                        startTime: 17100, 
+                        endTime: 17800, 
+                        startValue: [0, 100], 
+                        endValue: [0, 165],
+                        type: 'axis'
+                    });
+				controller.initializeState()
+				controller.initializeState()
+				return controller;
+			} catch (error) {
+				console.error("Error loading data or initializing animation:", error);
+			}
+		}
+
+		controller = initializeAnimation();
 		
 		// printed from console.log(JSON.stringify(controller.data));
 		/*result = [{"name":"v1","color":"#0078AA","linewidth":3,"values":[{"x":2000,"y":4.3},{"x":2001,"y":3.6},{"x":2002,"y":3.3},{"x":2003,"y":3.6},{"x":2004,"y":4},{"x":2005,"y":5.2},{"x":2006,"y":5.8},{"x":2007,"y":7.2},{"x":2008,"y":7.7},{"x":2009,"y":8.6},{"x":2010,"y":9.1},{"x":2011,"y":9.4},{"x":2012,"y":9.5},{"x":2013,"y":9.5},{"x":2014,"y":9.6},{"x":2015,"y":9.7},{"x":2016,"y":9.6},{"x":2017,"y":9.5}]},{"name":"v2","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":10.4},{"x":2001,"y":9.8},{"x":2002,"y":9.6},{"x":2003,"y":9.4},{"x":2004,"y":9.6},{"x":2005,"y":10},{"x":2006,"y":10.3},{"x":2007,"y":10.8},{"x":2008,"y":11.2},{"x":2009,"y":11.7},{"x":2010,"y":11.8},{"x":2011,"y":11.7},{"x":2012,"y":11.6},{"x":2013,"y":11.6},{"x":2014,"y":11.5},{"x":2015,"y":11.6},{"x":2016,"y":11.4},{"x":2017,"y":11.1}]},{"name":"v3","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":14.1},{"x":2001,"y":13.6},{"x":2002,"y":13.5},{"x":2003,"y":13.2},{"x":2004,"y":13.3},{"x":2005,"y":13.8},{"x":2006,"y":14.2},{"x":2007,"y":14.7},{"x":2008,"y":15.1},{"x":2009,"y":15.6},{"x":2010,"y":15.9},{"x":2011,"y":15.6},{"x":2012,"y":15.5},{"x":2013,"y":15.3},{"x":2014,"y":15.2},{"x":2015,"y":15.2},{"x":2016,"y":14.9},{"x":2017,"y":14.4}]},{"name":"v4","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":17.4},{"x":2001,"y":16.9},{"x":2002,"y":16.9},{"x":2003,"y":16.7},{"x":2004,"y":16.8},{"x":2005,"y":17.2},{"x":2006,"y":17.6},{"x":2007,"y":18},{"x":2008,"y":18.3},{"x":2009,"y":18.8},{"x":2010,"y":19},{"x":2011,"y":19},{"x":2012,"y":19.1},{"x":2013,"y":18.7},{"x":2014,"y":18.4},{"x":2015,"y":18.4},{"x":2016,"y":17.9},{"x":2017,"y":17.4}]},{"name":"v5","color":"#4E944F","linewidth":3,"values":[{"x":2000,"y":20.1},{"x":2001,"y":19.7},{"x":2002,"y":19.7},{"x":2003,"y":19.6},{"x":2004,"y":19.7},{"x":2005,"y":20},{"x":2006,"y":20.4},{"x":2007,"y":20.9},{"x":2008,"y":21.3},{"x":2009,"y":21.8},{"x":2010,"y":22},{"x":2011,"y":21.9},{"x":2012,"y":21.7},{"x":2013,"y":21.3},{"x":2014,"y":21.1},{"x":2015,"y":21.2},{"x":2016,"y":20.7},{"x":2017,"y":20.2}]},{"name":"v6","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":22.9},{"x":2001,"y":22.3},{"x":2002,"y":22.3},{"x":2003,"y":22.2},{"x":2004,"y":22.3},{"x":2005,"y":22.6},{"x":2006,"y":22.9},{"x":2007,"y":23.3},{"x":2008,"y":23.4},{"x":2009,"y":23.9},{"x":2010,"y":24.1},{"x":2011,"y":24.1},{"x":2012,"y":24},{"x":2013,"y":23.5},{"x":2014,"y":23.2},{"x":2015,"y":23.3},{"x":2016,"y":22.9},{"x":2017,"y":22.3}]},{"name":"v7","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":25.5},{"x":2001,"y":24.9},{"x":2002,"y":24.8},{"x":2003,"y":24.7},{"x":2004,"y":24.8},{"x":2005,"y":24.9},{"x":2006,"y":25.2},{"x":2007,"y":25.7},{"x":2008,"y":25.6},{"x":2009,"y":26.1},{"x":2010,"y":26.3},{"x":2011,"y":26.5},{"x":2012,"y":26.4},{"x":2013,"y":25.8},{"x":2014,"y":25.2},{"x":2015,"y":25.4},{"x":2016,"y":25.1},{"x":2017,"y":24.5}]},{"name":"v8","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":27.9},{"x":2001,"y":27.3},{"x":2002,"y":27.3},{"x":2003,"y":27.3},{"x":2004,"y":27.3},{"x":2005,"y":27.3},{"x":2006,"y":27.7},{"x":2007,"y":28.2},{"x":2008,"y":28},{"x":2009,"y":28.3},{"x":2010,"y":28.6},{"x":2011,"y":28.6},{"x":2012,"y":28.5},{"x":2013,"y":27.9},{"x":2014,"y":27.7},{"x":2015,"y":27.8},{"x":2016,"y":27.3},{"x":2017,"y":26.8}]},{"name":"v9","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":30.5},{"x":2001,"y":29.9},{"x":2002,"y":29.9},{"x":2003,"y":29.7},{"x":2004,"y":29.8},{"x":2005,"y":29.9},{"x":2006,"y":29.8},{"x":2007,"y":30.2},{"x":2008,"y":29.9},{"x":2009,"y":30.2},{"x":2010,"y":30.3},{"x":2011,"y":30.4},{"x":2012,"y":30.3},{"x":2013,"y":29.7},{"x":2014,"y":29.4},{"x":2015,"y":29.9},{"x":2016,"y":29.2},{"x":2017,"y":28.6}]},{"name":"v10","color":"#B33030","linewidth":3,"values":[{"x":2000,"y":33.3},{"x":2001,"y":32.6},{"x":2002,"y":32.5},{"x":2003,"y":32.3},{"x":2004,"y":32.3},{"x":2005,"y":32.3},{"x":2006,"y":32.4},{"x":2007,"y":32.7},{"x":2008,"y":32.1},{"x":2009,"y":32.5},{"x":2010,"y":32.6},{"x":2011,"y":32.4},{"x":2012,"y":32.5},{"x":2013,"y":31.9},{"x":2014,"y":31.5},{"x":2015,"y":31.8},{"x":2016,"y":31.4},{"x":2017,"y":30.8}]},{"name":"v11","color":"#B33030","linewidth":3,"values":[{"x":2000,"y":36},{"x":2001,"y":35.3},{"x":2002,"y":35.2},{"x":2003,"y":35},{"x":2004,"y":35.1},{"x":2005,"y":35},{"x":2006,"y":35.1},{"x":2007,"y":35.3},{"x":2008,"y":34.7},{"x":2009,"y":34.9},{"x":2010,"y":34.7},{"x":2011,"y":34.7},{"x":2012,"y":34.8},{"x":2013,"y":34.1},{"x":2014,"y":33.7},{"x":2015,"y":34.1},{"x":2016,"y":33.6},{"x":2017,"y":33.1}]},{"name":"v12","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":38.8},{"x":2001,"y":38.1},{"x":2002,"y":38.2},{"x":2003,"y":38.1},{"x":2004,"y":38.1},{"x":2005,"y":37.9},{"x":2006,"y":37.9},{"x":2007,"y":38.3},{"x":2008,"y":37.1},{"x":2009,"y":36.9},{"x":2010,"y":37},{"x":2011,"y":36.8},{"x":2012,"y":36.9},{"x":2013,"y":36.1},{"x":2014,"y":35.8},{"x":2015,"y":36.2},{"x":2016,"y":35.8},{"x":2017,"y":35.3}]},{"name":"v13","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":41.9},{"x":2001,"y":41.1},{"x":2002,"y":41.2},{"x":2003,"y":41.4},{"x":2004,"y":41.2},{"x":2005,"y":40.9},{"x":2006,"y":40.7},{"x":2007,"y":41},{"x":2008,"y":39.6},{"x":2009,"y":39.4},{"x":2010,"y":38.9},{"x":2011,"y":38.9},{"x":2012,"y":38.9},{"x":2013,"y":38.1},{"x":2014,"y":37.8},{"x":2015,"y":38.1},{"x":2016,"y":38},{"x":2017,"y":37.5}]},{"name":"v14","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":45.3},{"x":2001,"y":44.5},{"x":2002,"y":44.5},{"x":2003,"y":44.7},{"x":2004,"y":44.6},{"x":2005,"y":44.3},{"x":2006,"y":44.1},{"x":2007,"y":44.4},{"x":2008,"y":42.9},{"x":2009,"y":42.7},{"x":2010,"y":42.7},{"x":2011,"y":42.2},{"x":2012,"y":42.3},{"x":2013,"y":41.2},{"x":2014,"y":40.8},{"x":2015,"y":41.2},{"x":2016,"y":41.2},{"x":2017,"y":40.7}]},{"name":"v15","color":"#4E944F","linewidth":3,"values":[{"x":2000,"y":49.5},{"x":2001,"y":48.7},{"x":2002,"y":48.8},{"x":2003,"y":49},{"x":2004,"y":48.8},{"x":2005,"y":48.4},{"x":2006,"y":48.2},{"x":2007,"y":48.4},{"x":2008,"y":46.5},{"x":2009,"y":46.3},{"x":2010,"y":45.8},{"x":2011,"y":45},{"x":2012,"y":45.1},{"x":2013,"y":43.7},{"x":2014,"y":43.4},{"x":2015,"y":44.1},{"x":2016,"y":43.8},{"x":2017,"y":43.4}]},{"name":"v16","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":54.2},{"x":2001,"y":53.5},{"x":2002,"y":53.4},{"x":2003,"y":53.9},{"x":2004,"y":53.7},{"x":2005,"y":53},{"x":2006,"y":53.1},{"x":2007,"y":53.3},{"x":2008,"y":50.7},{"x":2009,"y":50},{"x":2010,"y":49.9},{"x":2011,"y":49.4},{"x":2012,"y":49.2},{"x":2013,"y":48},{"x":2014,"y":47.4},{"x":2015,"y":48.3},{"x":2016,"y":48.3},{"x":2017,"y":47.9}]},{"name":"v17","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":60.9},{"x":2001,"y":60.1},{"x":2002,"y":59.9},{"x":2003,"y":60.3},{"x":2004,"y":60.4},{"x":2005,"y":59.6},{"x":2006,"y":59.2},{"x":2007,"y":59.5},{"x":2008,"y":56.5},{"x":2009,"y":55.8},{"x":2010,"y":55},{"x":2011,"y":54.1},{"x":2012,"y":53.8},{"x":2013,"y":52.9},{"x":2014,"y":52.5},{"x":2015,"y":53.4},{"x":2016,"y":53.2},{"x":2017,"y":52.9}]},{"name":"v18","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":70.5},{"x":2001,"y":69.7},{"x":2002,"y":69.3},{"x":2003,"y":70},{"x":2004,"y":70.1},{"x":2005,"y":68.3},{"x":2006,"y":68.2},{"x":2007,"y":68.3},{"x":2008,"y":63.7},{"x":2009,"y":62},{"x":2010,"y":61.1},{"x":2011,"y":60.5},{"x":2012,"y":60.8},{"x":2013,"y":59.5},{"x":2014,"y":59.6},{"x":2015,"y":60.6},{"x":2016,"y":60.8},{"x":2017,"y":60.1}]},{"name":"v19","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":89.6},{"x":2001,"y":87.5},{"x":2002,"y":86.4},{"x":2003,"y":86.5},{"x":2004,"y":87.8},{"x":2005,"y":85.7},{"x":2006,"y":85.7},{"x":2007,"y":85.7},{"x":2008,"y":77.7},{"x":2009,"y":73.6},{"x":2010,"y":72.6},{"x":2011,"y":71.1},{"x":2012,"y":70.7},{"x":2013,"y":69.6},{"x":2014,"y":69.5},{"x":2015,"y":71.2},{"x":2016,"y":70.3},{"x":2017,"y":70.6}]},{"name":"v20","color":"#0078AA","linewidth":3,"values":[{"x":2000,"y":162.6},{"x":2001,"y":151.9},{"x":2002,"y":147},{"x":2003,"y":149.4},{"x":2004,"y":153.2},{"x":2005,"y":146.4},{"x":2006,"y":147.7},{"x":2007,"y":148.5},{"x":2008,"y":124.4},{"x":2009,"y":111},{"x":2010,"y":111.4},{"x":2011,"y":107.4},{"x":2012,"y":109.7},{"x":2013,"y":103.4},{"x":2014,"y":105.6},{"x":2015,"y":107.2},{"x":2016,"y":105.9},{"x":2017,"y":108.5}]}];
