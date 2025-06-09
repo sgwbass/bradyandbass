@@ -75,6 +75,7 @@
                 this.startTimestamp = null;
                 this.pausedAt = 0;
 				this.maskScrubber = 0;
+				this.resumeOnMouseup = 0;
                 
                 this.setupChart();
                 this.setupControls();
@@ -266,17 +267,14 @@
 					.style('fill', 'none')
 					.style('pointer-events', 'all')
 					.on('mousemove', (event) => this.handleMouseMove(event))
-					.on('mouseenter', () => this.showTooltip())
 					.on('mouseleave', () => this.hideTooltip());
 					
 				const keyVentiles = [0, 4, 9, 10, 14, 19]; // line indices
 				keyVentiles.forEach(i => {
 					const dot = g.append('circle')
 						.attr('class', `line-dot dot-${i}`)
-						.attr('r', 4)
+						.attr('r', 5)
 						.style('fill', this.data[i].color)
-						.style('stroke', 'white')
-						.style('stroke-width', 2)
 						.style('opacity', 0);
 					
 					this.elements.set(`dot-${i}`, { element: dot });
@@ -356,7 +354,7 @@
 				
 				//Add year
 				tooltipContent.append('text')
-					.attr('x', 8)
+					.attr('x', 0)
 					.attr('y', 12)
 					.style('font-size', '13px')
 					.style('font-weight', '600')
@@ -372,8 +370,8 @@
 					
 					// Color line indicator
 					tooltipContent.append('line')
-						.attr('x1', 8)
-						.attr('x2', 20)
+						.attr('x1', 0)
+						.attr('x2', 12)
 						.attr('y1', yPos - 2)
 						.attr('y2', yPos - 2)
 						.style('stroke', series.color)
@@ -381,11 +379,11 @@
 					
 					// Label and value text
 					tooltipContent.append('text')
-						.attr('x', 25)
+						.attr('x', 17)
 						.attr('y', yPos)
 						.style('font-size', '12px')
 						.text(`${ventile.label}: $${value.toFixed(1)}`);
-					
+
 					// Update corresponding dot position
 					const dotElement = this.elements.get(`dot-${ventile.index}`);
 					if (dotElement && dataPoint) {
@@ -394,14 +392,11 @@
 							.attr('cy', this.scales.y(dataPoint.y))
 							.style('opacity', 1);
 					}
+					
+					tooltip.style('opacity', 1);
 				});
 				
 				// Position tooltip
-				this.positionTooltip(mouseX, mouseY, tooltipContent);
-			}
-			
-			positionTooltip(mouseX, mouseY, tooltipContent) {
-				const tooltip = this.elements.get('tooltip').element;
 				const tooltipBg = tooltip.select('.tooltip-bg');
 				
 				// Calculate tooltip dimensions
@@ -411,12 +406,12 @@
 				const tooltipHeight = bbox.height + padding * 2;
 				
 				// Position to avoid going off screen
-				let tooltipX = mouseX + 15;
+				let tooltipX = mouseX + 25;
 				let tooltipY = mouseY - tooltipHeight / 2;
 				
 				// Adjust if tooltip would go off right edge
 				if (tooltipX + tooltipWidth > this.width) {
-					tooltipX = mouseX - tooltipWidth - 15;
+					tooltipX = mouseX - tooltipWidth;
 				}
 				
 				// Adjust if tooltip would go off top/bottom
@@ -432,13 +427,14 @@
 					.attr('height', tooltipHeight)
 					.attr('x', -padding)
 					.attr('y', -padding);
-			}
-			
-			showTooltip() {
-				if (this.isPlaying || this.isPaused) return;
-				
-				const tooltip = this.elements.get('tooltip').element;
-				tooltip.style('opacity', 1);
+				// Check where content bbox sits
+				/*tooltip.append('rect')
+				  .attr('x', 0)
+				  .attr('width', bbox.width)
+				  .attr('y', 0)
+				  .attr('height', bbox.height)
+				  .style('stroke', 'red')
+				  .style('fill', 'none');*/
 			}
 
 			hideTooltip() {
@@ -487,6 +483,10 @@
                 
                 scrubber.addEventListener('mousedown', (e) => {
                     isDragging = true;
+					if (this.isPlaying) {
+						this.pause();
+						this.resumeOnMouseup = 1;
+					}
                     updateScrubber(e);
                 });
                 
@@ -498,6 +498,8 @@
                 
                 document.addEventListener('mouseup', () => {
                     isDragging = false;
+					if (this.resumeOnMouseup) { this.play() }
+					this.resumeOnMouseup = 0;
                 });
             }
 
@@ -762,7 +764,6 @@
             }
             
             play() {
-				this.hideTooltip();
                 if (this.currentTime >= this.duration) {
                     this.restart();
                     return;
@@ -775,7 +776,6 @@
             }
             
             pause() {
-				this.hideTooltip();
                 this.isPlaying = false;
                 this.isPaused = true;
                 this.pausedAt = this.currentTime;
