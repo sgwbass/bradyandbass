@@ -43,16 +43,28 @@
 			<div class="chart-footnote"><sup>†</sup>Individuals alive at age 59 are ranked by their average total income between ages 55 and 59. Individuals with positive average total income are split into 20 equally sized groups or "ventiles" with ventile 1 having the lowest income and ventile 20 having the highest income. The 1.0 percent of the panel with zero or negative average total income between ages 55 and 59 are included in the totals but not presented separately here.</div>
 			<div class="chart-source">Source: Authors’ tabulation of IRS data</div>
         </div>
-		</div>
-		<p class="text-content">Although the importance of retirement plans varies with each worker’s lifetime earnings, most Americans maintain a high share of their spendable income in retirement. In fact, those who had lower income in their late 50s typically replace a higher share of their spendable income in retirement, despite being more reliant on Social Security. At age 72, lower-income Americans typically have replacement rates above 100 percent, meaning their spendable income in retirement exceeds that of their late 50s. Middle-income Americans also enjoy very high replacement rates at age 72—typically ranging between 90 percent and 95 percent.</p>
+	</div>
+	<p class="text-content">Although the importance of retirement plans varies with each worker’s lifetime earnings, most Americans maintain a high share of their spendable income in retirement. In fact, those who had lower income in their late 50s typically replace a higher share of their spendable income in retirement, despite being more reliant on Social Security. At age 72, lower-income Americans typically have replacement rates above 100 percent, meaning their spendable income in retirement exceeds that of their late 50s. Middle-income Americans also enjoy very high replacement rates at age 72—typically ranging between 90 percent and 95 percent.</p>
+	<div class="chart-container">
+		<div class="chart-header">
+            <h1 class="chart-title">Highest Income Experience Sharpest Declines in Spendable Income</h1>
+            <p class="chart-subtitle">Spendable income replacement rate* at age 72 by income ventile<sup>†</sup> (percentage)</p>
+        </div>
 		<div id="chart2"></div>
-		<p class="text-content">Although the importance of retirement plans varies with each worker’s lifetime earnings, most Americans maintain a high share of their spendable income in retirement. In fact, those who had lower income in their late 50s typically replace a higher share of their spendable income in retirement, despite being more reliant on Social Security. At age 72, lower-income Americans typically have replacement rates above 100 percent, meaning their spendable income in retirement exceeds that of their late 50s. Middle-income Americans also enjoy very high replacement rates at age 72—typically ranging between 90 percent and 95 percent.</p>
+		<div class="chart-notes">
+            <div class="chart-footnote">*The spendable income replacement rate is inflation-adjusted spendable income at a given age as a percentage of average inflation-adjusted spendable income between age 55 and 59. Individuals with zero or negative average age 55–59 income are excluded from the results presented here.</div>
+			<div class="chart-footnote"><sup>†</sup>Individuals alive at age 59 are ranked by their average total income between ages 55 and 59. Individuals with positive average total income are split into 20 equally sized groups or "ventiles" with ventile 1 having the lowest income and ventile 20 having the highest income. The 1.0 percent of the panel with zero or negative average total income between ages 55 and 59 are included in the totals but not presented separately here.</div>
+			<div class="chart-source">Source: Authors’ tabulation of IRS data</div>
+        </div>
+	</div>
+	<p class="text-content">Although the importance of retirement plans varies with each worker’s lifetime earnings, most Americans maintain a high share of their spendable income in retirement. In fact, those who had lower income in their late 50s typically replace a higher share of their spendable income in retirement, despite being more reliant on Social Security. At age 72, lower-income Americans typically have replacement rates above 100 percent, meaning their spendable income in retirement exceeds that of their late 50s. Middle-income Americans also enjoy very high replacement rates at age 72—typically ranging between 90 percent and 95 percent.</p>
     </div>
 
     <script>
         class AnimationController {
             constructor(data, {duration = 20000, transitions = [], elements = new Map(), x = {min: 2000, max: 2017}, y = {min: 0, max: 100},
-				chartWidth = 800, chartHeight = 400, startFromFinal = true, chartID = "#chart", animated = true} = {}) {
+				chartWidth = 800, chartHeight = 400, startFromFinal = true, chartID = "#chart", animated = true, tooltipVars = null, tooltipPrefix = '',
+				tooltipTitlePrefix = ''} = {}) {
 				this.data = data;
                 this.duration = duration; // milliseconds
 				this.durationSeconds = (this.duration / 1000).toFixed(1); // for display under scrubber
@@ -65,6 +77,9 @@
 				this.chartHeight = chartHeight;
 				this.chartID = chartID;
 				this.animated = animated;
+				this.tooltipVars = tooltipVars;
+				this.tooltipPrefix = tooltipPrefix;
+				this.tooltipTitlePrefix = tooltipTitlePrefix;
 				
 				this.initializeTime = 0;
 				if (startFromFinal) {
@@ -93,10 +108,16 @@
                     .append("svg")
                     .attr("width", this.chartWidth)
                     .attr("height", this.chartHeight);
-                
+
+				svg.append("clipPath")
+					.attr("id", "chartBounds") 
+					.append("rect") // Everything outside the circle will be clipped and therefore invisible.
+					.attr("width", width)
+					.attr("height", height);
+					
                 const g = svg.append("g")
                     .attr("transform", `translate(${margin.left},${margin.top})`);
-                
+					
                 // Create scales
 				this.scales = {
                     x: null,
@@ -106,83 +127,11 @@
                 // Axis update is currently overriding the initial y values and using the first transition start values
 				this.scales.y = d3.scaleLinear().domain([this.y.min, this.y.max]).range([height, 0]);
                 
-                // Create axes
-				const parseDate = d3.timeFormat("’%y")
-                this.xAxis1 = d3.axisBottom(this.scales.x).tickFormat(d => `${55 + (d - 2000)}`).ticks(18);
-				this.xAxis2 = d3.axisBottom(this.scales.x).tickFormat(d => parseDate(new Date(d, 0, 1))).ticks(18);
-                this.yAxis = d3.axisLeft(this.scales.y).ticks(6).tickSize(-width);
-                
-                const xAxisGroup = g.append("g")
-                    .attr("class", "axis x-axis")
-                    .attr("transform", `translate(0,${height})`)
-                    .call(this.xAxis1);
-				const xAxisGroup2 = g.append("g")
-                    .attr("class", "axis x-axis")
-                    .attr("transform", `translate(0,${height+20})`)
-                    .call(this.xAxis2);
-				xAxisGroup.selectAll("path").remove();
-				xAxisGroup2.selectAll("path,line").remove();
-                
-                const yAxisGroup = g.append("g")
-                    .attr("class", "axis y-axis")
-                    .call(this.yAxis);
-				yAxisGroup.selectAll("path,line").remove();
-				
-                // Add grid lines
-                const gridGroup = g.append("g").attr("class", "grid");
-                
-                // Y grid lines
-                gridGroup.selectAll(".y-grid")
-                    .data(this.scales.y.ticks(6))
-                    .enter()
-                    .append("line")
-                    .attr("class", "grid-line y-grid")
-                    .attr("x1", 0)
-                    .attr("x2", width)
-                    .attr("y1", d => this.scales.y(d))
-                    .attr("y2", d => this.scales.y(d));
-                
-                // X grid lines
-                gridGroup.selectAll(".x-grid")
-                    .data(this.scales.x.ticks(18))
-                    .enter()
-                    .append("line")
-                    .attr("class", "grid-line x-grid")
-                    .attr("x1", d => this.scales.x(d))
-                    .attr("x2", d => this.scales.x(d))
-                    .attr("y1", 0)
-                    .attr("y2", height);
-                
-                // Add axis labels
-                xAxisGroup.append("text")
-                    .attr("class", "axis-label")
-                    .attr("x", 0)
-                    .attr("y", 18)
-                    .style("text-anchor", "end")
-                    .text("Age");
-				xAxisGroup.append("text")
-                    .attr("class", "axis-label")
-                    .attr("x", 0)
-                    .attr("y", 38)
-                    .style("text-anchor", "end")
-                    .text("Year");
-					
-                /*yAxisGroup.append("text")
-                    .attr("class", "axis-label")
-                    .attr("transform", "rotate(-90)")
-                    .attr("x", -height / 2)
-                    .attr("y", -40)
-                    .style("text-anchor", "middle")
-                    .text("Revenue (Billions USD)");*/
-                
                 // Create line generator
                 this.line = d3.line()
                     .x(d => this.scales.x(d.x))
                     .y(d => this.scales.y(d.y));
 					
-				this.elements.set('grid', { element: gridGroup });
-                this.elements.set('y-axis', { element: yAxisGroup });
-                
                 this.svg = svg;
                 this.chartArea = g;
                 this.width = width;
@@ -199,6 +148,7 @@
 					.attr("plot-type", "line")
 					.style("stroke", series.color)
 					.style("stroke-width", series.linewidth)
+					.attr("clip-path", "url(#chartBounds)")
 					.style("opacity", 1);
 				
 				if (this.animated) {
@@ -287,36 +237,29 @@
 			}
 			
 			updateTooltip(year, mouseX, mouseY) {
-				const keyVentiles = [
-					{ index: 19, label: 'Ventile 20' }, // Top ventile first
-					{ index: 14, label: 'Ventile 15' },
-					{ index: 10, label: 'Ventile 11' },
-					{ index: 9, label: 'Ventile 10' },
-					{ index: 4, label: 'Ventile 5' },
-					{ index: 0, label: 'Ventile 1' }
-				];
-				
 				const tooltip = this.elements.get('tooltip').element;
 				const tooltipContent = tooltip.select('.tooltip-content');
 				
 				// Clear existing content
 				tooltipContent.selectAll('*').remove();
 				
+				let yPos = 12;
+				
 				//Add year
 				tooltipContent.append('text')
 					.attr('x', 0)
-					.attr('y', 12)
+					.attr('y', yPos)
 					.style('font-size', '13px')
 					.style('font-weight', '600')
-					.text(`${year}`);
+					.text(`${this.tooltipTitlePrefix + ' ' + year}`);
 				
-				// Add entries for each ventile
-				keyVentiles.forEach((ventile, i) => {
-					const series = this.data[ventile.index];
+				// Add entries for each entry
+				this.tooltipVars.forEach((entry, i) => {
+					const series = this.data[i];
 					const dataPoint = series.values.find(d => d.x === year);
 					const value = dataPoint ? dataPoint.y : 0;
 					
-					const yPos = (i+1) * 18 + 12; // Spacing between entries
+					yPos += 18; // Spacing between entries
 					
 					// Color line indicator
 					tooltipContent.append('line')
@@ -332,10 +275,10 @@
 						.attr('x', 17)
 						.attr('y', yPos)
 						.style('font-size', '12px')
-						.text(`${ventile.label}: $${value.toFixed(1)}`);
+						.text(`${this.data[i].name}: ${this.tooltipPrefix + value.toFixed(1)}`);
 
 					// Update corresponding dot position
-					const dotElement = this.elements.get(`dot-${ventile.index}`);
+					const dotElement = this.elements.get(`dot-${i}`);
 					if (dotElement && dataPoint) {
 						dotElement.element
 							.attr('cx', this.scales.x(year))
@@ -392,8 +335,7 @@
 				tooltip.style('opacity', 0);
 				
 				// Hide all dots
-				const keyVentiles = [0, 4, 9, 10, 14, 19];
-				keyVentiles.forEach(i => {
+				this.tooltipVars.forEach((entry, i) => {
 					const dotElement = this.elements.get(`dot-${i}`);
 					if (dotElement) {
 						dotElement.element.style('opacity', 0);
@@ -452,6 +394,87 @@
 					this.resumeOnMouseup = 0;
                 });
             }
+			
+			addAxis(type, {numYTicks = 6, numXTicks = 18, tickFormat = null, xDelta = 0, yDelta = 0, showPath = false, showLine = false, labelText = null, labelX = 0, labelY = 0, mainAxis = true} = {}) {
+				let axis;
+				let xAdj = 0;
+				let yAdj = 0;
+				let axisType;
+				
+				if (type==='bottom') {
+					if (tickFormat) { axis = d3.axisBottom(this.scales.x).tickFormat(tickFormat).ticks(numXTicks);}
+					else { axis = d3.axisBottom(this.scales.x).ticks(numXTicks);}
+					yAdj = this.height;
+					axisType = 'x';
+				}
+				else if (type==='top') {
+					if (tickFormat) { axis = d3.axisTop(this.scales.x).tickFormat(tickFormat).ticks(numXTicks);}
+					else { axis = d3.axisTop(this.scales.x).ticks(numXTicks);}
+					axisType = 'x';
+				}
+				else if (type==='left') {
+					if (tickFormat) { axis = d3.axisLeft(this.scales.y).tickFormat(tickFormat).ticks(numYTicks);}
+					else { axis = d3.axisLeft(this.scales.y).ticks(numYTicks);}
+					axisType = 'y';
+				}
+				
+				const axisGroup = this.chartArea.append("g")
+					.attr("class", "axis " + axisType + "-axis")
+					.attr("transform", `translate(${xDelta+xAdj},${yDelta+yAdj})`)
+					.call(axis);
+				
+				if (axisType==='y' && mainAxis===true) {
+					this.yAxis = axis;
+					this.elements.set('y-axis', { element: axisGroup });
+				}
+
+				if (!showPath) { axisGroup.selectAll("path").remove(); }
+				if (!showLine) { axisGroup.selectAll("line").remove(); }
+				
+				if (labelText) {
+					// Add axis labels
+					axisGroup.append("text")
+						.attr("class", "axis-label")
+						.attr("x", labelX)
+						.attr("y", labelY)
+						.style("text-anchor", "end")
+						.text(labelText);
+				}
+
+				this.numXTicks = numXTicks;
+				this.numYTicks = numYTicks;
+			}
+			addGrid({showXGrid = true, showYGrid = true, numXTicks = this.numXTicks, numYTicks = this.numYTicks} = {}) {
+				const gridGroup = this.chartArea.append("g").attr("class", "grid");
+				
+				if (showYGrid) {
+					// Y grid lines (horizontal)
+					gridGroup.selectAll(".y-grid")
+						.data(this.scales.y.ticks(numYTicks))
+						.enter()
+						.append("line")
+						.attr("class", "grid-line y-grid")
+						.attr("x1", 0)
+						.attr("x2", this.width)
+						.attr("y1", d => this.scales.y(d))
+						.attr("y2", d => this.scales.y(d));
+				}
+				
+				if (showXGrid) {
+					// X grid lines (vertical)
+					gridGroup.selectAll(".x-grid")
+						.data(this.scales.x.ticks(numXTicks))
+						.enter()
+						.append("line")
+						.attr("class", "grid-line x-grid")
+						.attr("x1", d => this.scales.x(d))
+						.attr("x2", d => this.scales.x(d))
+						.attr("y1", 0)
+						.attr("y2", this.height);
+				}
+				
+				this.elements.set('grid', { element: gridGroup });
+			}
 
 			drawLine(lineNumber,startTime,endTime,labelRight=true) {
 				this.transitions.push({
@@ -504,16 +527,29 @@
 			}
             
             initializeState() {
-				const keyVentiles = [0, 4, 9, 10, 14, 19]; // line indices
-				keyVentiles.forEach(i => {
-					const dot = this.chartArea.append('circle')
-						.attr('class', `line-dot dot-${i}`)
-						.attr('r', 5)
-						.style('fill', this.data[i].color)
-						.style('opacity', 0);
+				if (this.tooltipVars) {
+					this.tooltipVars.forEach((tooltipVar, i) => {
+						const dot = this.chartArea.append('circle')
+							.attr('class', `line-dot dot-${i}`)
+							.attr('r', 5)
+							.style('fill', this.data[i].color)
+							.style('opacity', 0);
 					
 					this.elements.set(`dot-${i}`, { element: dot });
-				});
+					});
+				}
+				else {
+					this.data.forEach((row, i) => {
+						console.log(this.chartID, i);
+						const dot = this.chartArea.append('circle')
+							.attr('class', `line-dot dot-${i}`)
+							.attr('r', 5)
+							.style('fill', this.data[i].color)
+							.style('opacity', 0);
+						
+						this.elements.set(`dot-${i}`, { element: dot });
+					});
+				}
 			
 				// Tooltip element
 				const tooltip = this.chartArea.append('g')
@@ -655,16 +691,18 @@
 
 				// Update the y-axis
 				const yAxisGroup = this.elements.get('y-axis').element;
-				const yTicks = this.yAxis.scale(this.scales.y).ticks(6);
+				const yTicks = this.yAxis.scale(this.scales.y).ticks(this.numYTicks);
 				yAxisGroup.call(this.yAxis);
 				yAxisGroup.selectAll("path").remove();
 
 				// Update grid lines
-				const gridGroup = this.elements.get('grid').element;
-				gridGroup.selectAll('.y-grid')
-					.data(this.scales.y.ticks(6))
-					.attr('y1', d => this.scales.y(d))
-					.attr('y2', d => this.scales.y(d));
+				if (this.hasYGrid) {
+					const gridGroup = this.elements.get('grid').element;
+					gridGroup.selectAll('.y-grid')
+						.data(this.scales.y.ticks(this.numYTicks))
+						.attr('y1', d => this.scales.y(d))
+						.attr('y2', d => this.scales.y(d));
+				}
 
 				// Redraw all lines
 				this.data.forEach((series, i) => {
@@ -844,7 +882,7 @@
 				const result = [];
 			
 				// Process each row of data
-				data.forEach(function(row) {
+				data.forEach(function(row, i) {
 					const variableName = row.ventile; // Convert to number
 					
 					// For each year
@@ -855,7 +893,7 @@
 						// Add object to the corresponding variable array
 						tempData.push({x: +year, y: +value},);
 					}
-					result.push({name: variableName,
+					result.push({name: 'Ventile ' + (i+1),
 						color: colors[variableName],
 						linewidth: lineWidths[variableName],
 						values: tempData
@@ -869,8 +907,22 @@
 		async function initializeAnimation() {
 			try {
 				const data = await loadData();
+				const tooltipVars = new Map();
+				tooltipVars.set(19, 'Ventile 20');
+				tooltipVars.set(14, 'Ventile 15');
+				tooltipVars.set(10, 'Ventile 11');
+				tooltipVars.set(9, 'Ventile 10');
+				tooltipVars.set(4, 'Ventile 5');
+				tooltipVars.set(0, 'Ventile 1');
 				
-				controller = new AnimationController(data);
+				controller = new AnimationController(data, {tooltipVars: tooltipVars, tooltipPrefix: '$'});
+			
+				const parseDate = d3.timeFormat("’%y");
+				controller.addAxis('bottom', {labelText: 'Age', labelY: 18, tickFormat: d => 55 + (d - controller.x.min)});
+				controller.addAxis('bottom', {labelText: 'Year', labelY: 18, tickFormat: d => parseDate(new Date(d, 0, 1)), yDelta: 20, mainAxis: false});
+				controller.addAxis('left', {ticks: 6});
+				controller.addGrid();
+				
 				data.forEach((series, i) => {
 					controller.addLineElement(series, i);
                 });
@@ -962,16 +1014,93 @@
 		}
 
 		controller = initializeAnimation();
-		
-		async function initializeAnimation2() {
+		/*async function initializeAnimation2() {
 			try {
 				const data = await loadData();
 				
 				controller2 = new AnimationController(data, {animated: false, chartID: '#chart2', y: {min:0, max:165}});
+			
+				const parseDate = d3.timeFormat("’%y");
+				controller2.addAxis('bottom', {labelText: 'Age', labelY: 18, tickFormat: d => 55 + (d - controller.x.min)});
+				controller2.addAxis('bottom', {labelText: 'Year', labelY: 18, tickFormat: d => parseDate(new Date(d, 0, 1)), yDelta: 20, mainAxis: false});
+				controller2.addAxis('left', {ticks: 6});
+				controller2.addGrid();
+				
 				data.forEach((series, i) => {
 					controller2.addLineElement(series, i);
                 });
+				
 				controller2.addLabel(2017.2, (data[9].values[data[9].values.length-1].y + data[10].values[data[10].values.length-1].y) / 2, '10 + 11', 'label-20');
+				controller2.initializeState()
+				return controller2;
+			} catch (error) {
+				console.error("Error loading data or initializing animation:", error);
+			}
+		}
+
+		controller2 = initializeAnimation2();*/
+		
+
+		function loadData2() {
+			return d3.csv("fig13.csv").then(function(data2) {
+				const colors = {
+					'p25': "#B2B1B9", 'median': "#F77E21", 'p75': "#B2B1B9"
+				};
+
+				const lineWidths = {
+					'p25': 1, 'median': 3, 'p75': 1
+				};
+				
+				const names = {
+					'p25': '25th percentile', 'median': 'Median', 'p75': '75th percentile'
+				};
+			
+				// Initialize the result object with 20 variables
+				const result = [];
+			
+				// Process each row of data
+				data2.forEach(function(row) {
+					const variableName = row.dist;
+					console.log(row);
+					
+					// For each ventile
+					tempData = [];
+					for (let vent = 1; vent <= 20; vent++) {
+						const value = +row[vent]; // Convert to number
+						
+						// Add object to the corresponding variable array
+						tempData.push({x: +vent, y: +value},);
+					}
+					result.push({name: names[variableName],
+						color: colors[variableName],
+						linewidth: lineWidths[variableName],
+						values: tempData
+					});
+				});
+				return result;
+			});
+		}
+
+		async function initializeAnimation2() {
+			try {
+				const data2 = await loadData2();
+				const tooltipVars = new Map();
+				tooltipVars.set(2, '75th percentile');
+				tooltipVars.set(1, 'Median');
+				tooltipVars.set(0, '25th percentile');
+				
+				controller2 = new AnimationController(data2, {animated: false, chartID: '#chart2', x: {min:1, max:20}, y: {min:0, max:250}, tooltipVars: tooltipVars, tooltipTitlePrefix: 'Ventile'});
+				console.log(data2);
+				const parseDate = d3.timeFormat("’%y");
+				controller2.addAxis('bottom', {labelText: 'Income ventile', labelY: 45, labelX: 397, ticks: 20});
+				controller2.addAxis('left', {ticks: 6});
+				controller2.addGrid();
+				
+				data2.forEach((series, i) => {
+					//console.log(series.values);
+					controller2.addLineElement(series, i);
+                });
+				
 				controller2.initializeState()
 				return controller2;
 			} catch (error) {
