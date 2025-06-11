@@ -50,6 +50,20 @@
             <h1 class="chart-title">Highest Income Experience Sharpest Declines in Spendable Income</h1>
             <p class="chart-subtitle">Spendable income replacement rate* at age 72 by income ventile<sup>†</sup> (percentage)</p>
         </div>
+			<div class="legend">
+                <div class="legend-item">
+                    <div class="legend-line" style="background-color: #B2B1B9; height:1.5px;"></div>
+                    <span class="legend-text">25th percentile</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line" style="background-color: #F77E21;"></div>
+                    <span class="legend-text">Median</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line" style="background-color: #B2B1B9; height:1.5px;"></div>
+                    <span class="legend-text">75th percentile</span>
+                </div>
+            </div>
 		<div id="chart2"></div>
 		<div class="chart-notes">
             <div class="chart-footnote">*The spendable income replacement rate is inflation-adjusted spendable income at a given age as a percentage of average inflation-adjusted spendable income between age 55 and 59. Individuals with zero or negative average age 55–59 income are excluded from the results presented here.</div>
@@ -131,6 +145,13 @@
                 this.line = d3.line()
                     .x(d => this.scales.x(d.x))
                     .y(d => this.scales.y(d.y));
+
+				// Add recession shading					
+				// Create bar generator
+                /*this.bar = d3.bar()
+                    .x(d => this.scales.x(d.x))
+                    .y(d => this.scales.y(d.y));*/
+					
 					
                 this.svg = svg;
                 this.chartArea = g;
@@ -446,7 +467,7 @@
 			}
 			addGrid({showXGrid = true, showYGrid = true, numXTicks = this.numXTicks, numYTicks = this.numYTicks} = {}) {
 				const gridGroup = this.chartArea.append("g").attr("class", "grid");
-				
+				this.hasYGrid = false;
 				if (showYGrid) {
 					// Y grid lines (horizontal)
 					gridGroup.selectAll(".y-grid")
@@ -458,6 +479,7 @@
 						.attr("x2", this.width)
 						.attr("y1", d => this.scales.y(d))
 						.attr("y2", d => this.scales.y(d));
+					this.hasYGrid = true;
 				}
 				
 				if (showXGrid) {
@@ -540,7 +562,6 @@
 				}
 				else {
 					this.data.forEach((row, i) => {
-						console.log(this.chartID, i);
 						const dot = this.chartArea.append('circle')
 							.attr('class', `line-dot dot-${i}`)
 							.attr('r', 5)
@@ -682,7 +703,7 @@
             
 			handleAxisTransition(transition) {
 				const [minY, maxY] = transition.currentValue;
-				const isKeyMoment = Math.abs(this.currentTime - 16300) < 50 || Math.abs(this.currentTime - 16400) < 50;
+				const isKeyMoment = Math.abs(this.currentTime - 16350) < 100;
 
 				// Update the y scale
 				this.scales.y = d3.scaleLinear()
@@ -698,10 +719,31 @@
 				// Update grid lines
 				if (this.hasYGrid) {
 					const gridGroup = this.elements.get('grid').element;
-					gridGroup.selectAll('.y-grid')
-						.data(this.scales.y.ticks(this.numYTicks))
+					const yTicks = this.scales.y.ticks(this.numYTicks);
+
+					// JOIN
+					const yGridLines = gridGroup.selectAll('.y-grid')
+						.data(yTicks);
+
+					// EXIT
+					yGridLines.exit().remove();
+
+					// ENTER
+					yGridLines.enter()
+						.append('line')
+						.attr('class', 'grid-line y-grid')
+						.attr('x1', 0)
+						.attr('x2', this.width)
 						.attr('y1', d => this.scales.y(d))
 						.attr('y2', d => this.scales.y(d));
+
+					// UPDATE
+					yGridLines
+						.attr('x1', 0)
+						.attr('x2', this.width)
+						.attr('y1', d => this.scales.y(d))
+						.attr('y2', d => this.scales.y(d));
+
 				}
 
 				// Redraw all lines
@@ -1061,7 +1103,6 @@
 				// Process each row of data
 				data2.forEach(function(row) {
 					const variableName = row.dist;
-					console.log(row);
 					
 					// For each ventile
 					tempData = [];
@@ -1090,7 +1131,6 @@
 				tooltipVars.set(0, '25th percentile');
 				
 				controller2 = new AnimationController(data2, {animated: false, chartID: '#chart2', x: {min:1, max:20}, y: {min:0, max:250}, tooltipVars: tooltipVars, tooltipTitlePrefix: 'Ventile'});
-				console.log(data2);
 				const parseDate = d3.timeFormat("’%y");
 				controller2.addAxis('bottom', {labelText: 'Income ventile', labelY: 45, labelX: 397, ticks: 20});
 				controller2.addAxis('left', {ticks: 6});
@@ -1108,7 +1148,11 @@
 			}
 		}
 
-		controller2 = initializeAnimation2();
+		controller2 = initializeAnimation2().then(d => {
+			controller2.elements.get('label-2').element.style('opacity', 1).text('75th percentile');
+			controller2.elements.get('label-1').element.style('opacity', 1).text('Median');
+			controller2.elements.get('label-0').element.style('opacity', 1).text('25th percentile');
+		});
 		
 		// printed from console.log(JSON.stringify(controller.data));
 		/*result = [{"name":"v1","color":"#0078AA","linewidth":3,"values":[{"x":2000,"y":4.3},{"x":2001,"y":3.6},{"x":2002,"y":3.3},{"x":2003,"y":3.6},{"x":2004,"y":4},{"x":2005,"y":5.2},{"x":2006,"y":5.8},{"x":2007,"y":7.2},{"x":2008,"y":7.7},{"x":2009,"y":8.6},{"x":2010,"y":9.1},{"x":2011,"y":9.4},{"x":2012,"y":9.5},{"x":2013,"y":9.5},{"x":2014,"y":9.6},{"x":2015,"y":9.7},{"x":2016,"y":9.6},{"x":2017,"y":9.5}]},{"name":"v2","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":10.4},{"x":2001,"y":9.8},{"x":2002,"y":9.6},{"x":2003,"y":9.4},{"x":2004,"y":9.6},{"x":2005,"y":10},{"x":2006,"y":10.3},{"x":2007,"y":10.8},{"x":2008,"y":11.2},{"x":2009,"y":11.7},{"x":2010,"y":11.8},{"x":2011,"y":11.7},{"x":2012,"y":11.6},{"x":2013,"y":11.6},{"x":2014,"y":11.5},{"x":2015,"y":11.6},{"x":2016,"y":11.4},{"x":2017,"y":11.1}]},{"name":"v3","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":14.1},{"x":2001,"y":13.6},{"x":2002,"y":13.5},{"x":2003,"y":13.2},{"x":2004,"y":13.3},{"x":2005,"y":13.8},{"x":2006,"y":14.2},{"x":2007,"y":14.7},{"x":2008,"y":15.1},{"x":2009,"y":15.6},{"x":2010,"y":15.9},{"x":2011,"y":15.6},{"x":2012,"y":15.5},{"x":2013,"y":15.3},{"x":2014,"y":15.2},{"x":2015,"y":15.2},{"x":2016,"y":14.9},{"x":2017,"y":14.4}]},{"name":"v4","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":17.4},{"x":2001,"y":16.9},{"x":2002,"y":16.9},{"x":2003,"y":16.7},{"x":2004,"y":16.8},{"x":2005,"y":17.2},{"x":2006,"y":17.6},{"x":2007,"y":18},{"x":2008,"y":18.3},{"x":2009,"y":18.8},{"x":2010,"y":19},{"x":2011,"y":19},{"x":2012,"y":19.1},{"x":2013,"y":18.7},{"x":2014,"y":18.4},{"x":2015,"y":18.4},{"x":2016,"y":17.9},{"x":2017,"y":17.4}]},{"name":"v5","color":"#4E944F","linewidth":3,"values":[{"x":2000,"y":20.1},{"x":2001,"y":19.7},{"x":2002,"y":19.7},{"x":2003,"y":19.6},{"x":2004,"y":19.7},{"x":2005,"y":20},{"x":2006,"y":20.4},{"x":2007,"y":20.9},{"x":2008,"y":21.3},{"x":2009,"y":21.8},{"x":2010,"y":22},{"x":2011,"y":21.9},{"x":2012,"y":21.7},{"x":2013,"y":21.3},{"x":2014,"y":21.1},{"x":2015,"y":21.2},{"x":2016,"y":20.7},{"x":2017,"y":20.2}]},{"name":"v6","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":22.9},{"x":2001,"y":22.3},{"x":2002,"y":22.3},{"x":2003,"y":22.2},{"x":2004,"y":22.3},{"x":2005,"y":22.6},{"x":2006,"y":22.9},{"x":2007,"y":23.3},{"x":2008,"y":23.4},{"x":2009,"y":23.9},{"x":2010,"y":24.1},{"x":2011,"y":24.1},{"x":2012,"y":24},{"x":2013,"y":23.5},{"x":2014,"y":23.2},{"x":2015,"y":23.3},{"x":2016,"y":22.9},{"x":2017,"y":22.3}]},{"name":"v7","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":25.5},{"x":2001,"y":24.9},{"x":2002,"y":24.8},{"x":2003,"y":24.7},{"x":2004,"y":24.8},{"x":2005,"y":24.9},{"x":2006,"y":25.2},{"x":2007,"y":25.7},{"x":2008,"y":25.6},{"x":2009,"y":26.1},{"x":2010,"y":26.3},{"x":2011,"y":26.5},{"x":2012,"y":26.4},{"x":2013,"y":25.8},{"x":2014,"y":25.2},{"x":2015,"y":25.4},{"x":2016,"y":25.1},{"x":2017,"y":24.5}]},{"name":"v8","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":27.9},{"x":2001,"y":27.3},{"x":2002,"y":27.3},{"x":2003,"y":27.3},{"x":2004,"y":27.3},{"x":2005,"y":27.3},{"x":2006,"y":27.7},{"x":2007,"y":28.2},{"x":2008,"y":28},{"x":2009,"y":28.3},{"x":2010,"y":28.6},{"x":2011,"y":28.6},{"x":2012,"y":28.5},{"x":2013,"y":27.9},{"x":2014,"y":27.7},{"x":2015,"y":27.8},{"x":2016,"y":27.3},{"x":2017,"y":26.8}]},{"name":"v9","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":30.5},{"x":2001,"y":29.9},{"x":2002,"y":29.9},{"x":2003,"y":29.7},{"x":2004,"y":29.8},{"x":2005,"y":29.9},{"x":2006,"y":29.8},{"x":2007,"y":30.2},{"x":2008,"y":29.9},{"x":2009,"y":30.2},{"x":2010,"y":30.3},{"x":2011,"y":30.4},{"x":2012,"y":30.3},{"x":2013,"y":29.7},{"x":2014,"y":29.4},{"x":2015,"y":29.9},{"x":2016,"y":29.2},{"x":2017,"y":28.6}]},{"name":"v10","color":"#B33030","linewidth":3,"values":[{"x":2000,"y":33.3},{"x":2001,"y":32.6},{"x":2002,"y":32.5},{"x":2003,"y":32.3},{"x":2004,"y":32.3},{"x":2005,"y":32.3},{"x":2006,"y":32.4},{"x":2007,"y":32.7},{"x":2008,"y":32.1},{"x":2009,"y":32.5},{"x":2010,"y":32.6},{"x":2011,"y":32.4},{"x":2012,"y":32.5},{"x":2013,"y":31.9},{"x":2014,"y":31.5},{"x":2015,"y":31.8},{"x":2016,"y":31.4},{"x":2017,"y":30.8}]},{"name":"v11","color":"#B33030","linewidth":3,"values":[{"x":2000,"y":36},{"x":2001,"y":35.3},{"x":2002,"y":35.2},{"x":2003,"y":35},{"x":2004,"y":35.1},{"x":2005,"y":35},{"x":2006,"y":35.1},{"x":2007,"y":35.3},{"x":2008,"y":34.7},{"x":2009,"y":34.9},{"x":2010,"y":34.7},{"x":2011,"y":34.7},{"x":2012,"y":34.8},{"x":2013,"y":34.1},{"x":2014,"y":33.7},{"x":2015,"y":34.1},{"x":2016,"y":33.6},{"x":2017,"y":33.1}]},{"name":"v12","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":38.8},{"x":2001,"y":38.1},{"x":2002,"y":38.2},{"x":2003,"y":38.1},{"x":2004,"y":38.1},{"x":2005,"y":37.9},{"x":2006,"y":37.9},{"x":2007,"y":38.3},{"x":2008,"y":37.1},{"x":2009,"y":36.9},{"x":2010,"y":37},{"x":2011,"y":36.8},{"x":2012,"y":36.9},{"x":2013,"y":36.1},{"x":2014,"y":35.8},{"x":2015,"y":36.2},{"x":2016,"y":35.8},{"x":2017,"y":35.3}]},{"name":"v13","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":41.9},{"x":2001,"y":41.1},{"x":2002,"y":41.2},{"x":2003,"y":41.4},{"x":2004,"y":41.2},{"x":2005,"y":40.9},{"x":2006,"y":40.7},{"x":2007,"y":41},{"x":2008,"y":39.6},{"x":2009,"y":39.4},{"x":2010,"y":38.9},{"x":2011,"y":38.9},{"x":2012,"y":38.9},{"x":2013,"y":38.1},{"x":2014,"y":37.8},{"x":2015,"y":38.1},{"x":2016,"y":38},{"x":2017,"y":37.5}]},{"name":"v14","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":45.3},{"x":2001,"y":44.5},{"x":2002,"y":44.5},{"x":2003,"y":44.7},{"x":2004,"y":44.6},{"x":2005,"y":44.3},{"x":2006,"y":44.1},{"x":2007,"y":44.4},{"x":2008,"y":42.9},{"x":2009,"y":42.7},{"x":2010,"y":42.7},{"x":2011,"y":42.2},{"x":2012,"y":42.3},{"x":2013,"y":41.2},{"x":2014,"y":40.8},{"x":2015,"y":41.2},{"x":2016,"y":41.2},{"x":2017,"y":40.7}]},{"name":"v15","color":"#4E944F","linewidth":3,"values":[{"x":2000,"y":49.5},{"x":2001,"y":48.7},{"x":2002,"y":48.8},{"x":2003,"y":49},{"x":2004,"y":48.8},{"x":2005,"y":48.4},{"x":2006,"y":48.2},{"x":2007,"y":48.4},{"x":2008,"y":46.5},{"x":2009,"y":46.3},{"x":2010,"y":45.8},{"x":2011,"y":45},{"x":2012,"y":45.1},{"x":2013,"y":43.7},{"x":2014,"y":43.4},{"x":2015,"y":44.1},{"x":2016,"y":43.8},{"x":2017,"y":43.4}]},{"name":"v16","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":54.2},{"x":2001,"y":53.5},{"x":2002,"y":53.4},{"x":2003,"y":53.9},{"x":2004,"y":53.7},{"x":2005,"y":53},{"x":2006,"y":53.1},{"x":2007,"y":53.3},{"x":2008,"y":50.7},{"x":2009,"y":50},{"x":2010,"y":49.9},{"x":2011,"y":49.4},{"x":2012,"y":49.2},{"x":2013,"y":48},{"x":2014,"y":47.4},{"x":2015,"y":48.3},{"x":2016,"y":48.3},{"x":2017,"y":47.9}]},{"name":"v17","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":60.9},{"x":2001,"y":60.1},{"x":2002,"y":59.9},{"x":2003,"y":60.3},{"x":2004,"y":60.4},{"x":2005,"y":59.6},{"x":2006,"y":59.2},{"x":2007,"y":59.5},{"x":2008,"y":56.5},{"x":2009,"y":55.8},{"x":2010,"y":55},{"x":2011,"y":54.1},{"x":2012,"y":53.8},{"x":2013,"y":52.9},{"x":2014,"y":52.5},{"x":2015,"y":53.4},{"x":2016,"y":53.2},{"x":2017,"y":52.9}]},{"name":"v18","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":70.5},{"x":2001,"y":69.7},{"x":2002,"y":69.3},{"x":2003,"y":70},{"x":2004,"y":70.1},{"x":2005,"y":68.3},{"x":2006,"y":68.2},{"x":2007,"y":68.3},{"x":2008,"y":63.7},{"x":2009,"y":62},{"x":2010,"y":61.1},{"x":2011,"y":60.5},{"x":2012,"y":60.8},{"x":2013,"y":59.5},{"x":2014,"y":59.6},{"x":2015,"y":60.6},{"x":2016,"y":60.8},{"x":2017,"y":60.1}]},{"name":"v19","color":"#B2B1B9","linewidth":1,"values":[{"x":2000,"y":89.6},{"x":2001,"y":87.5},{"x":2002,"y":86.4},{"x":2003,"y":86.5},{"x":2004,"y":87.8},{"x":2005,"y":85.7},{"x":2006,"y":85.7},{"x":2007,"y":85.7},{"x":2008,"y":77.7},{"x":2009,"y":73.6},{"x":2010,"y":72.6},{"x":2011,"y":71.1},{"x":2012,"y":70.7},{"x":2013,"y":69.6},{"x":2014,"y":69.5},{"x":2015,"y":71.2},{"x":2016,"y":70.3},{"x":2017,"y":70.6}]},{"name":"v20","color":"#0078AA","linewidth":3,"values":[{"x":2000,"y":162.6},{"x":2001,"y":151.9},{"x":2002,"y":147},{"x":2003,"y":149.4},{"x":2004,"y":153.2},{"x":2005,"y":146.4},{"x":2006,"y":147.7},{"x":2007,"y":148.5},{"x":2008,"y":124.4},{"x":2009,"y":111},{"x":2010,"y":111.4},{"x":2011,"y":107.4},{"x":2012,"y":109.7},{"x":2013,"y":103.4},{"x":2014,"y":105.6},{"x":2015,"y":107.2},{"x":2016,"y":105.9},{"x":2017,"y":108.5}]}];
