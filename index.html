@@ -771,7 +771,7 @@
 						
 						label.attr('y', newYPosition);
 					}
-
+					
 					/*// Get new path length
 					const newTotalLength = path.node().getTotalLength();
 					elementData.totalLength = newTotalLength;
@@ -925,15 +925,12 @@
 			
 				// Process each row of data
 				data.forEach(function(row, i) {
-					const variableName = row.ventile; // Convert to number
+					const variableName = row.ventile;
 					
-					// For each year
 					tempData = [];
+					// For each year
 					for (let year = 2000; year <= 2017; year++) {
-						const value = +row[year]; // Convert to number
-						
-						// Add object to the corresponding variable array
-						tempData.push({x: +year, y: +value},);
+						tempData.push({x: year, y: +row[year]},);
 					}
 					result.push({name: 'Ventile ' + (i+1),
 						color: colors[variableName],
