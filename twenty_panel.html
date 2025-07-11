@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The US Retirement System Is Working</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <link rel='stylesheet' href='animation.css'>
+	<style>
+		.panel:hover {
+			cursor: grab;
+		}
+		.axis.yaxis { stroke: none; ]
+	</style>
+</head>
+<body>
+	<div class="content">
+    <div class="chart-container">
+        <div class="chart-header">
+            <h1 class="chart-title">Lower Income Typically Maintain Higher Share of Spendable Income</h1>
+            <p class="chart-subtitle">Spendable income replacement rate* by age/year and income ventile<sup>†</sup> (percentage)</p>
+        </div>
+        
+        <div id="chart"></div>
+        <div class="chart-notes">
+            <div class="chart-footnote">*The spendable income replacement rate is inflation-adjusted spendable income at a given age as a percentage of average inflation-adjusted spendable income between age 55 and 59. Individuals with zero or negative average age 55–59 income are excluded from the results presented here.</div>
+			<div class="chart-footnote"><sup>†</sup>Individuals alive at age 59 are ranked by their average total income between ages 55 and 59. Individuals with positive average total income are split into 20 equally sized groups or "ventiles" with ventile 1 having the lowest income and ventile 20 having the highest income. The 1.0 percent of the panel with zero or negative average total income between ages 55 and 59 are included in the totals but not presented separately here.</div>
+			<div class="chart-source">Source: Authors’ tabulation of IRS data</div>
+        </div>
+	</div>
+	
+    </div>
+
+    <script>
+        class TwentyPanel {
+            constructor(data, {elements = new Map(), x = {min: 2000, max: 2017}, y = {min: 0, max: 100},
+				chartWidth = 800, chartHeight = 400, chartID = "#chart"} = {}) {
+				this.data = data;
+                
+				this.x = x; 
+				this.y = y;
+				this.chartWidth = chartWidth;
+				this.chartHeight = chartHeight;
+				this.chartID = chartID;
+								
+                this.setupChart();
+            }
+			
+			setupChart() {
+				//const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+                const width = this.chartWidth;
+                const height = this.chartHeight;
+                
+                const svg = d3.select(this.chartID)
+                    .append("svg")
+                    .attr("width", this.chartWidth)
+                    .attr("height", this.chartHeight);
+				
+				svg.append("clipPath")
+					.attr("id", "chartBounds") 
+					.append("rect") // Everything outside the axis will be clipped and therefore invisible.
+					.attr("width", width)
+					.attr("height", height);
+
+				const g = svg.append("g")
+					.attr("clip-path", "url(#chartBounds)");
+				this.charts = [];
+				
+				const panelWidth = width / 4;
+				const panelHeight = height / 5;
+
+
+				// Create scales
+				this.scales = new Map();
+				this.line = new Map();
+				this.panels = new Map();
+				this.config = new Map();
+				
+				const margins = {left: 30, right: 10, bottom: 20, top: 10};
+				//Add x close button
+				this.close = g.append("text")
+					.text('X')
+					.attr('class','panel')
+					.attr('x', width-margins.right)
+					.attr('y', margins.top*4)
+					.attr("text-anchor", "end")
+					.attr("dominant-baseline", "top")
+					.style('font-size', '48px')
+					.style('font-weight','700')
+					.style('fill', '#ccc')
+					.attr('opacity', '0')
+					.attr('transform', 'scale(1,0.6)');
+
+				for (let i=0; i < 20; i++) {
+					const xPos = panelWidth * (i % 4);
+					const yPos = panelHeight * Math.floor(i / 4);
+					//console.log(i, xPos, yPos, xPos+panelWidth, yPos+panelHeight);
+					
+					const xMin = d3.min(this.data.get('p25')['data'][i].values, d => d.x);
+					const yMin = Math.min(0,d3.min(this.data.get('p25')['data'][i].values, d => d.y));
+					const xMax = d3.max(this.data.get('p75')['data'][i].values, d => d.x);
+					let yMax = d3.max(this.data.get('p75')['data'][i].values, d => d.y);
+					if (yMax < 100) { yMax = Math.ceil(yMax/10)*10; }
+					else if (yMax < 200) { yMax = Math.ceil(yMax/25)*25; }
+					else { yMax = Math.ceil(yMax/50)*50; }
+
+					let xAxis;
+					let yAxis;
+					let xAxisGroup;
+					let yAxisGroup;
+					let gridGroup;
+					
+					this.scales.set(i, {x: d3.scaleLinear().range([panelWidth*0.025 + margins.left, panelWidth*0.975-margins.right]).domain([this.x.min,this.x.max]),
+										y:d3.scaleLinear().range([panelHeight-margins.bottom, margins.top]).domain([yMin,yMax])});
+
+					this.panels.set(i, g.append("g")
+						.attr("class", "panel")
+						.attr("transform", `translate(${xPos},${yPos})`)
+						.attr("opacity", 1));
+						
+					xAxis = d3.axisBottom(this.scales.get(i)['x']).tickValues([2000,2017]).tickFormat(d => 55 + (d - this.x.min));
+					yAxis = d3.axisLeft(this.scales.get(i)['y']).ticks(3);
+					
+					yAxisGroup = this.panels.get(i).append("g")
+						.attr("class", "axis y-axis")
+						.attr("transform", `translate(${margins.left},0)`)
+						.call(yAxis);
+					xAxisGroup = this.panels.get(i).append("g")
+						.attr("class", "axis x-axis")
+						.attr("transform", `translate(0,${panelHeight-margins.bottom})`)
+						.call(xAxis);
+						
+					gridGroup = this.panels.get(i).append("g").attr("class", "grid");
+					gridGroup.selectAll(".y-grid")
+						.data(this.scales.get(i).y.ticks(3))
+						.enter()
+						.append("line")
+						.attr("class", "grid-line y-grid")
+						.attr("x1", margins.left)
+						.attr("x2", panelWidth - margins.right)
+						.attr("y1", d => this.scales.get(i).y(d))
+						.attr("y2", d => this.scales.get(i).y(d));
+						
+					this.panels.get(i).append("text")
+						.attr('class', 'ventile')
+						.attr("x", margins.left + (panelWidth-margins.left-margins.right) / 2)
+						.attr("y", panelHeight / 1.4)
+						.attr("text-anchor", "middle")
+						.style("font-size", "4em")
+						.style("font-weight", "bold")
+						.style('fill', 'gray')
+						.text(`${i + 1}`)
+						.attr('opacity', 0.3);
+					
+					const hoverBorder = this.panels.get(i).append('rect')
+						.attr('class', 'panel')
+						.attr('width', panelWidth)
+						.attr('height', panelHeight)
+						.attr('fill', '#ccc')
+						.attr('stroke', '#777')
+						.attr('stroke-width', 2)
+						.attr('opacity', '0')
+						.on('mousemove', function (d, i) {
+							d3.select(this).attr('opacity', '0.2')})
+						.on('mouseleave', function (d, i) {
+							d3.select(this).attr('opacity', '0')})
+						.on('click', () => this.handleClick(i));
+							
+					this.panels.get(i).selectAll("*")
+						.filter(function() { return this !== hoverBorder.node(); })
+						.style("pointer-events", "none");
+						
+					// Create line generator
+					this.line.set(i, d3.line()
+						.x(d => this.scales.get(i).x(d.x))
+						.y(d => this.scales.get(i).y(d.y)));
+					
+					yAxisGroup.selectAll("path").remove();
+					xAxisGroup.selectAll("path").remove();
+					
+					const path25 = this.panels.get(i).append("path")
+						.datum(this.data.get('p25')['data'][i].values)
+						.attr("class", `data-line`)
+						.attr("d", this.line.get(i))
+						.attr("plot-type", "line")
+						.style("stroke", this.data.get('p25').color)
+						.style("stroke-width", this.data.get('p25').linewidth)
+						//.attr("clip-path", "url(#chartBounds)")
+						.style("opacity", 1);
+					const pathMedian = this.panels.get(i).append("path")
+						.datum(this.data.get('median')['data'][i].values)
+						.attr("class", `data-line`)
+						.attr("d", this.line.get(i))
+						.attr("plot-type", "line")
+						.style("stroke", this.data.get('median').color)
+						.style("stroke-width", this.data.get('median').linewidth)
+						//.attr("clip-path", "url(#chartBounds)")
+						.style("opacity", 1);
+					const path75 = this.panels.get(i).append("path")
+						.datum(this.data.get('p75')['data'][i].values)
+						.attr("class", `data-line`)
+						.attr("d", this.line.get(i))
+						.attr("plot-type", "line")
+						.style("stroke", this.data.get('p75').color)
+						.style("stroke-width", this.data.get('p75').linewidth)
+						//.attr("clip-path", "url(#chartBounds)")
+						.style("opacity", 1);
+						
+					this.config.set(i, {'xMin': xMin, 'xMax': xMax, 'yMin': yMin, 'yMax': yMax, 'xPos': xPos, 'yPos': yPos});
+						
+					};
+
+                this.svg = svg;
+				this.chartArea = g;
+                this.width = width;
+                this.height = height;
+				this.bigPanel = null;
+				this.margins = margins;
+				this.panelWidth = panelWidth;
+				this.panelHeight = panelHeight;
+				
+			}
+			
+			handleClick(clickedPanel) {
+				const transitionDuration = 2000;
+				for (let i = 0; i < 20; i++) {
+					this.panels.get(i).select('rect').attr('opacity', '0');
+					this.panels.get(i).select('rect').on('click', null);
+					this.panels.get(i).select('rect').on('mousemove', null);
+					if (i===clickedPanel) { 
+						this.panels.get(i).select('.ventile').transition().duration(transitionDuration)
+							.attr("x", this.margins.left + (this.width / 2))
+							.attr("y", this.height / 1.6)
+							.style('font-size', '16em');
+						this.scales.set(i, {x: d3.scaleLinear().range([this.width*0.025 + this.margins.left, this.width*0.975-this.margins.right]).domain([this.x.min,this.x.max]),
+												y:d3.scaleLinear().range([this.height-this.margins.bottom, this.margins.top]).domain([this.config.get(i)['yMin'],this.config.get(i)['yMax']])});
+						this.panels.get(i).transition().duration(transitionDuration).attr("transform", `translate(0,0)`)
+						const xAxis = d3.axisBottom(this.scales.get(i)['x']).ticks(18).tickFormat(d => 55 + (d - this.x.min));
+						const yAxis = d3.axisLeft(this.scales.get(i)['y']).ticks(3);
+						const xAxisGroup = this.panels.get(i).select(".x-axis");
+						const yAxisGroup = this.panels.get(i).select(".y-axis");
+						yAxisGroup.transition().duration(transitionDuration).call(yAxis).on("start", function(){ yAxisGroup.select("path").remove();});
+						xAxisGroup.transition().duration(transitionDuration).call(xAxis).attr("transform", `translate(0,${this.height-this.margins.bottom})`).on("start", function(){ xAxisGroup.select("path").remove();});
+						
+						this.line.set(i, d3.line()
+							.x(d => this.scales.get(i).x(d.x))
+							.y(d => this.scales.get(i).y(d.y)));
+						
+						this.panels.get(i).selectAll('.data-line').transition().duration(transitionDuration).attr("d", this.line.get(i));
+						
+						this.panels.get(i).select(".grid").selectAll('.y-grid').transition().duration(transitionDuration)
+							.attr("x1", this.margins.left)
+							.attr("x2", this.width - this.margins.right)
+							.attr("y1", d => this.scales.get(i).y(d))
+							.attr("y2", d => this.scales.get(i).y(d));
+					}
+					else {
+						const xPos = this.config.get(i).xPos;
+						const yPos = this.config.get(i).yPos;
+						const xDelta = xPos - this.config.get(clickedPanel).xPos;
+						const yDelta = yPos - this.config.get(clickedPanel).yPos;
+						
+						//If left of expanded panel, shift left by xDelta
+						//If same column, no shift; 
+						//If right of expanded panel, shift to edge plus delta (adjust for panel width)
+						const finalX = (xDelta < 0 ? xDelta : (xDelta===0 ? xPos : this.width + xDelta - this.panelWidth));
+						const finalY = (yDelta < 0 ? yDelta : (yDelta===0 ? yPos : this.height + yDelta - this.panelHeight));
+						
+						this.panels.get(i).transition().duration(transitionDuration).attr("transform", `translate(${finalX},${finalY})`);
+
+					}
+
+					this.bigPanel = clickedPanel;
+				}
+				this.close.transition().delay(transitionDuration).duration(0).attr('opacity','0.65');
+				setTimeout(() => {
+					this.close.on('click', () => this.restore20())
+				}, transitionDuration);
+				this.chartArea.raise();
+			}
+			restore20() {
+				const transitionDuration = 2000;
+				for (let i = 0; i < 20; i++) {
+				
+					setTimeout(() => {
+						this.panels.get(i).select('rect')
+							.on('click', () => this.handleClick(i))
+							.on('mousemove', function (d, i) {d3.select(this).attr('opacity', '0.2')});
+						}, transitionDuration);
+					if (i === this.bigPanel) {
+						//Reverse transitions
+						this.panels.get(i).select('.ventile').transition().duration(transitionDuration)
+							.attr("x", this.margins.left + (this.panelWidth-this.margins.left-this.margins.right) / 2)
+							.attr("y", this.panelHeight / 1.4)
+							.style('font-size', '4em');
+						this.scales.set(i, {x: d3.scaleLinear().range([this.panelWidth*0.025 + this.margins.left, this.panelWidth*0.975-this.margins.right]).domain([this.x.min,this.x.max]),
+										y:d3.scaleLinear().range([this.panelHeight-this.margins.bottom, this.margins.top]).domain([this.config.get(i)['yMin'],this.config.get(i)['yMax']])});
+						this.panels.get(i).transition().duration(transitionDuration).attr("transform", `translate(${this.config.get(i)['xPos']},${this.config.get(i)['yPos']})`)
+						const xAxis = d3.axisBottom(this.scales.get(i)['x']).tickValues([2000,2017]).tickFormat(d => 55 + (d - this.x.min));
+						const yAxis = d3.axisLeft(this.scales.get(i)['y']).ticks(3);
+						const xAxisGroup = this.panels.get(i).select(".x-axis");
+						const yAxisGroup = this.panels.get(i).select(".y-axis");
+						yAxisGroup.transition().duration(transitionDuration).call(yAxis).on("start", function(){ yAxisGroup.select("path").remove();});
+						xAxisGroup.transition().duration(transitionDuration).call(xAxis).attr("transform", `translate(0,${this.panelHeight-this.margins.bottom})`).on("start", function(){ xAxisGroup.select("path").remove();});
+						
+						this.line.set(i, d3.line()
+							.x(d => this.scales.get(i).x(d.x))
+							.y(d => this.scales.get(i).y(d.y)));
+						
+						this.panels.get(i).selectAll('.data-line').transition().duration(transitionDuration).attr("d", this.line.get(i));
+						
+						this.panels.get(i).select(".grid").selectAll('.y-grid').transition().duration(transitionDuration)
+							.attr("x1", this.margins.left)
+							.attr("x2", this.panelWidth - this.margins.right)
+							.attr("y1", d => this.scales.get(i).y(d))
+							.attr("y2", d => this.scales.get(i).y(d));
+					}
+					else { this.panels.get(i).transition().duration(transitionDuration).attr("transform", `translate(${this.config.get(i).xPos}, ${this.config.get(i).yPos})`); }
+				}
+				this.close.attr('opacity','0').on('click', () => null);
+			}
+		}
+		
+		function loadData() {
+			return d3.csv("fig12.csv").then(function(data) {
+				const colors = {
+					'p25': "#B2B1B9", 'median': "#F77E21", 'p75': "#B2B1B9"
+				};
+
+				const lineWidths = {
+					'p25': 1, 'median': 3, 'p75': 1
+				};
+				
+				const names = {
+					'p25': '25th percentile', 'median': 'Median', 'p75': '75th percentile'
+				};
+				
+				const temp25 = [];
+				const tempMed = [];
+				const temp75 = [];
+				// Process each row of data
+				data.forEach(function(row) {
+					tempData = [];
+					// For each year
+					for (let year = 2000; year <= 2017; year++) {
+						tempData.push({x: year, y: +row[year]},);
+					}
+					if (row['dist']==='p25') { temp25.push({name: 'Ventile ' + row['ventile'], values: tempData}); }
+					if (row['dist']==='med') { tempMed.push({name: 'Ventile ' + row['ventile'], values: tempData}); }
+					if (row['dist']==='p75') { temp75.push({name: 'Ventile ' + row['ventile'], values: tempData}); }
+
+				});
+				const result = new Map(); // one element for each line type (25th, median, 75th)
+				Object.keys(names).forEach(dist => {
+					let tempData;
+					if (dist==='p25') { tempData = temp25; }
+					if (dist==='median') { tempData = tempMed; }
+					if (dist==='p75') { tempData = temp75; }
+					const meta = {name: names[dist],
+						color: colors[dist],
+						linewidth: lineWidths[dist],
+						data: tempData
+					};
+					result.set(dist, meta);
+				});
+				return result;
+			});
+		}
+		
+		async function initializeChart() {
+			try {
+				const data = await loadData();
+				chart = new TwentyPanel(data);
+				return chart;
+			} catch (error) {
+				console.error("Error loading data or initializing animation:", error);
+			}
+		}
+		
+		chart = initializeChart();
+	</script>
+</body>
+</html>
