@@ -398,13 +398,16 @@
 					
 					let yPos = 12;
 					
+					let xHeader;
+					if (this.tooltipTitlePrefix.length > 0 ) { xHeader = this.tooltipTitlePrefix + ' ' + (clampedX - 1945) }
+					else { xHeader = (clampedX - 1945) };
 					//Add x value header
 					tooltipContent.append('text')
 						.attr('x', 0)
 						.attr('y', yPos)
 						.style('font-size', '13px')
 						.style('font-weight', '600')
-						.text(`${this.tooltipTitlePrefix + ' ' + clampedX}`);
+						.text(`${xHeader}`);
 					
 					// Add entries for each entry
 					['p25','median','p75'].forEach((path) => {
@@ -541,7 +544,7 @@
 		async function initializeChart() {
 			try {
 				const data = await loadData();
-				chart = new TwentyPanel(data);
+				chart = new TwentyPanel(data, {tooltipTitlePrefix: 'Age'});
 				return chart;
 			} catch (error) {
 				console.error("Error loading data or initializing animation:", error);
