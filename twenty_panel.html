@@ -10,6 +10,9 @@
 		.panel:hover {
 			cursor: grab;
 		}
+		.panel.disabled:hover {
+			cursor: default;
+		}
 		.axis.yaxis { stroke: none; ]
 	</style>
 </head>
@@ -34,7 +37,7 @@
     <script>
         class TwentyPanel {
             constructor(data, {elements = new Map(), x = {min: 2000, max: 2017}, y = {min: 0, max: 100},
-				chartWidth = 800, chartHeight = 400, chartID = "#chart"} = {}) {
+				chartWidth = 800, chartHeight = 400, chartID = "#chart", tooltipTitlePrefix = '', tooltipPrefix = ''} = {}) {
 				this.data = data;
                 
 				this.x = x; 
@@ -42,6 +45,8 @@
 				this.chartWidth = chartWidth;
 				this.chartHeight = chartHeight;
 				this.chartID = chartID;
+				this.tooltipTitlePrefix = tooltipTitlePrefix;
+				this.tooltipPrefix = tooltipPrefix;
 								
                 this.setupChart();
             }
@@ -79,18 +84,18 @@
 				const margins = {left: 30, right: 10, bottom: 20, top: 10};
 				//Add x close button
 				this.close = g.append("text")
-					.text('X')
+					.text('✕')
 					.attr('class','panel')
 					.attr('x', width-margins.right)
 					.attr('y', margins.top*4)
 					.attr("text-anchor", "end")
 					.attr("dominant-baseline", "top")
-					.style('font-size', '48px')
+					.style('font-size', '40px')
 					.style('font-weight','700')
 					.style('fill', '#ccc')
-					.attr('opacity', '0')
-					.attr('transform', 'scale(1,0.6)');
-
+					.style('opacity', '0');
+					
+				this.elements = new Map();
 				for (let i=0; i < 20; i++) {
 					const xPos = panelWidth * (i % 4);
 					const yPos = panelHeight * Math.floor(i / 4);
@@ -150,26 +155,21 @@
 						.style("font-weight", "bold")
 						.style('fill', 'gray')
 						.text(`${i + 1}`)
-						.attr('opacity', 0.3);
+						.style('opacity', 0.3);
 					
 					const hoverBorder = this.panels.get(i).append('rect')
-						.attr('class', 'panel')
 						.attr('width', panelWidth)
 						.attr('height', panelHeight)
 						.attr('fill', '#ccc')
 						.attr('stroke', '#777')
 						.attr('stroke-width', 2)
-						.attr('opacity', '0')
+						.style('opacity', '0')
 						.on('mousemove', function (d, i) {
-							d3.select(this).attr('opacity', '0.2')})
+							d3.select(this).style('opacity', '0.2')})
 						.on('mouseleave', function (d, i) {
-							d3.select(this).attr('opacity', '0')})
+							d3.select(this).style('opacity', '0')})
 						.on('click', () => this.handleClick(i));
 							
-					this.panels.get(i).selectAll("*")
-						.filter(function() { return this !== hoverBorder.node(); })
-						.style("pointer-events", "none");
-						
 					// Create line generator
 					this.line.set(i, d3.line()
 						.x(d => this.scales.get(i).x(d.x))
@@ -207,9 +207,53 @@
 						.style("opacity", 1);
 						
 					this.config.set(i, {'xMin': xMin, 'xMax': xMax, 'yMin': yMin, 'yMax': yMax, 'xPos': xPos, 'yPos': yPos});
-						
+					
+					this.elements.set(i, {});
+					// Initialize dots for mouseover
+					['p25','median','p75'].forEach((path) => {
+						const dot = this.panels.get(i).append('circle')
+							.attr('class', `line-dot dot-${path}`)
+							.attr('r', 5)
+							.style('fill', this.data.get(path).color)
+							.style('opacity', 0)
+							.attr("clip-path", "url(#chartBounds)");
+						this.elements.get(i)[path] = dot;
+						});
+					
+					this.panels.get(i).selectAll("*")
+						.filter(function() { return this !== hoverBorder.node(); })
+						.style("pointer-events", "none");
+					
 					};
+					
+				// Initialize tooltip
+				this.tooltip = g.append('g')
+					.attr('class', 'tooltip')
+					.style('opacity', 0)
+					.style('pointer-events', 'none');
 
+				// Tooltip background
+				this.tooltipBg = this.tooltip.append('rect')
+					.attr('class', 'tooltip-bg')
+					.attr('rx', 4)
+					.attr('ry', 4)
+					.style('fill', 'white')
+					.style('stroke', '#e2e8f0')
+					.style('stroke-width', 1)
+					.style('opacity', 0.9);
+
+				// Tooltip content container
+				this.tooltipContent = this.tooltip.append('g')
+					.attr('class', 'tooltip-content');
+				
+				this.mouseOverlay = g.append('rect')
+					.attr('width', width)
+					.attr('height', height)
+					.style('fill', 'none')
+					.style('pointer-events', 'none')
+					.on('mousemove', (event) => this.updateTooltip(event))
+					.on('mouseleave', () => this.hideTooltip());
+				
                 this.svg = svg;
 				this.chartArea = g;
                 this.width = width;
@@ -222,9 +266,12 @@
 			}
 			
 			handleClick(clickedPanel) {
+				this.panels.forEach((entry, i) => {
+					entry.attr('class', 'panel disabled');
+				});
 				const transitionDuration = 2000;
 				for (let i = 0; i < 20; i++) {
-					this.panels.get(i).select('rect').attr('opacity', '0');
+					this.panels.get(i).select('rect').style('opacity', '0');
 					this.panels.get(i).select('rect').on('click', null);
 					this.panels.get(i).select('rect').on('mousemove', null);
 					if (i===clickedPanel) { 
@@ -271,21 +318,29 @@
 					}
 
 					this.bigPanel = clickedPanel;
+					setTimeout(() => {
+						this.mouseOverlay.style('pointer-events', 'all');
+						}, transitionDuration);
 				}
-				this.close.transition().delay(transitionDuration).duration(0).attr('opacity','0.65');
+				this.close.transition().delay(transitionDuration).duration(0).style('opacity','0.65');
 				setTimeout(() => {
-					this.close.on('click', () => this.restore20())
+					this.close.on('click', () => this.restore20()).on('mousemove', (event) => this.updateTooltip(event)).on('mouseleave', () => this.hideTooltip());
 				}, transitionDuration);
+				
+				this.close.raise();
 				this.chartArea.raise();
 			}
 			restore20() {
 				const transitionDuration = 2000;
+				this.mouseOverlay.style('pointer-events', 'none');
+				this.hideTooltip();
 				for (let i = 0; i < 20; i++) {
 				
 					setTimeout(() => {
 						this.panels.get(i).select('rect')
 							.on('click', () => this.handleClick(i))
-							.on('mousemove', function (d, i) {d3.select(this).attr('opacity', '0.2')});
+							.on('mousemove', function (d, i) {d3.select(this).style('opacity', '0.2')});
+						this.panels.get(i).attr('class', 'panel');
 						}, transitionDuration);
 					if (i === this.bigPanel) {
 						//Reverse transitions
@@ -317,7 +372,123 @@
 					}
 					else { this.panels.get(i).transition().duration(transitionDuration).attr("transform", `translate(${this.config.get(i).xPos}, ${this.config.get(i).yPos})`); }
 				}
-				this.close.attr('opacity','0').on('click', () => null);
+				this.close.style('opacity','0').on('click', () => null);
+				this.bigPanel = null;
+			}
+			
+			updateTooltip(event) {
+				if (this.bigPanel) {
+					const i = this.bigPanel;
+					const tooltip = this.tooltip;
+					const tooltipContent = this.tooltipContent;
+					
+					const [mouseX, mouseY] = d3.pointer(event);
+			
+					// Convert mouse X to data X value
+					const xValue = this.scales.get(i).x.invert(mouseX);
+					
+					// Find nearest x (round to nearest integer)
+					const nearestX = Math.round(xValue);
+					
+					// Clamp to data range
+					const clampedX = Math.max(this.config.get(i).xMin, Math.min(this.config.get(i).xMax, nearestX));
+					
+					// Clear existing content
+					tooltipContent.selectAll('*').remove();
+					
+					let yPos = 12;
+					
+					//Add x value header
+					tooltipContent.append('text')
+						.attr('x', 0)
+						.attr('y', yPos)
+						.style('font-size', '13px')
+						.style('font-weight', '600')
+						.text(`${this.tooltipTitlePrefix + ' ' + clampedX}`);
+					
+					// Add entries for each entry
+					['p25','median','p75'].forEach((path) => {
+						const series = this.data.get(path)['data'][i];
+						const dataPoint = series.values.find(d => d.x === clampedX);
+						const value = dataPoint ? dataPoint.y : 0;
+						
+						yPos += 18; // Spacing between entries
+						
+						// Color line indicator
+						tooltipContent.append('line')
+							.attr('x1', 0)
+							.attr('x2', 12)
+							.attr('y1', yPos)
+							.attr('y2', yPos)
+							.style('stroke', this.data.get(path).color)
+							.style('stroke-width', this.data.get(path).linewidth);
+						
+						// Label and value text
+						tooltipContent.append('text')
+							.attr('x', 17)
+							.attr('y', yPos)
+							.attr("dominant-baseline", "middle")
+							.style('font-size', '12px')
+							.text(`${this.data.get(path).name}: ${this.tooltipPrefix + value.toFixed(1)}`);
+
+						// Update corresponding dot position
+						const dotElement = this.elements.get(i)[path];
+						if (dotElement && dataPoint) {
+							dotElement
+								.attr('cx', this.scales.get(i).x(clampedX))
+								.attr('cy', this.scales.get(i).y(dataPoint.y))
+								.style('opacity', 1);
+						}
+						
+						tooltip.style('opacity', 1);
+					});
+					
+					// Position tooltip
+					const tooltipBg = tooltip.select('.tooltip-bg');
+					
+					// Calculate tooltip dimensions
+					const bbox = tooltipContent.node().getBBox();
+					const padding = 8;
+					const tooltipWidth = bbox.width + padding * 2;
+					const tooltipHeight = bbox.height + padding * 2;
+					
+					// Position to avoid going off screen
+					let tooltipX = mouseX + 25;
+					let tooltipY = mouseY - tooltipHeight / 2;
+					
+					// Adjust if tooltip would go off right edge
+					if (tooltipX + tooltipWidth > this.width) {
+						tooltipX = mouseX - tooltipWidth;
+					}
+					
+					// Adjust if tooltip would go off top/bottom
+					if (tooltipY < 0) tooltipY = 5;
+					if (tooltipY + tooltipHeight > this.height) {
+						tooltipY = this.height - tooltipHeight - 5;
+					}
+					
+					// Update tooltip position and background
+					tooltip.attr('transform', `translate(${tooltipX}, ${tooltipY})`);
+					tooltipBg
+						.attr('width', tooltipWidth)
+						.attr('height', tooltipHeight)
+						.attr('x', -padding)
+						.attr('y', -padding);
+				}
+
+			}
+
+			hideTooltip() {
+				this.tooltip.style('opacity', 0);
+				
+				// Hide all dots
+				['p25','median','p75'].forEach((path) => {
+					if (this.bigPanel) { 
+						const dotElement = this.elements.get(this.bigPanel)[path]; 
+						if (dotElement) { dotElement.style('opacity', 0); }
+					}
+					
+				});
 			}
 		}
 		
