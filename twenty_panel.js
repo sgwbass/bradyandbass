@@ -243,13 +243,14 @@ class TwentyPanel {
 			if (i === this.bigPanel) {
 				this.scales.set(i, {x: d3.scaleLinear().range([this.width*0.025 + this.margins.left, this.width*0.975-this.margins.right]).domain([this.x.min,this.x.max]),
 									y:d3.scaleLinear().range([this.height-this.margins.bottom, this.margins.top]).domain([yMin,yMax])});
+				xAxis = d3.axisBottom(this.scales.get(i)['x']).ticks(18).tickFormat(d => 55 + (d - this.x.min));
 			} else {
 				this.scales.set(i, {x: d3.scaleLinear().range([this.panelWidth*0.025 + this.margins.left, this.panelWidth*0.975-this.margins.right]).domain([this.x.min,this.x.max]),
 									y:d3.scaleLinear().range([this.panelHeight-this.margins.bottom, this.margins.top]).domain([yMin,yMax])});
+				xAxis = d3.axisBottom(this.scales.get(i)['x']).tickValues([2000,2017]).tickFormat(d => 55 + (d - this.x.min));
 			}
 
-				
-			xAxis = d3.axisBottom(this.scales.get(i)['x']).tickValues([2000,2017]).tickFormat(d => 55 + (d - this.x.min));
+			
 			yAxis = d3.axisLeft(this.scales.get(i)['y']).ticks(3);
 			
 			yAxisGroup = this.panels.get(i).select(".y-axis").call(yAxis);
@@ -305,6 +306,10 @@ class TwentyPanel {
 			if (this.bigPanel !== null) {
 				const i = this.bigPanel;
 				
+				this.mouseOverlay.style('pointer-events', 'none');
+				this.hideTooltip();
+				this.close.attr('class', 'panel disabled').style('opacity','0').on('click', () => null).on('mousemove', () => null).on('mouseleave', () => null);
+				
 				//Fade out
 				this.panels.get(i).transition().duration(transitionDuration).attr('opacity', '0');
 				
@@ -313,9 +318,22 @@ class TwentyPanel {
 					this.panels.get(this.bigPanel).transition().duration(transitionDuration).attr('opacity', '1');
 				}, transitionDuration);
 				
+				setTimeout(() => { 
+					this.mouseOverlay.style('pointer-events', 'all');
+					this.close.transition().duration(0).style('opacity','0.65');
+					this.close.attr('class', 'panel').on('click', () => this.restore20()).on('mousemove', (event) => this.updateTooltip(event)).on('mouseleave', () => this.hideTooltip());
+				}, transitionDuration*2);
+				
 			}
 			else {
+				this.panels.forEach((entry, i) => {
+					entry.attr('class', 'panel disabled');
+				});
 				for (let i=0; i < 20; i++) {
+					this.panels.get(i).select('rect').style('opacity', '0');
+					this.panels.get(i).select('rect').on('click', null);
+					this.panels.get(i).select('rect').on('mousemove', null);
+			
 					//Move out to the sides
 					const xPos = this.config.get(i).xPos;
 					const yPos = this.config.get(i).yPos;
