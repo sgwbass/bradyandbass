@@ -58,6 +58,13 @@ body {
 	line-height: 1.4;
 }
 
+.dropdown {
+	font-size: 16px;
+	color: #64748b;
+	margin-top: 1em;
+	margin-bottom: 0;
+}
+
 .chart-notes {
 	margin-top: 20px;
 	font-size: 12px;
