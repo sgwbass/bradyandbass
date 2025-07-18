@@ -6,6 +6,12 @@ body {
 	color: #2c3e50;
 }
 
+#dataSeriesDropdown {
+	font-family: Inter, sans-serif;
+	font-size: 16px;
+	color: #64748b;
+}
+
 .heading {
 	font-size: 1.7rem;
 	font-weight: 400;
